@@ -30,6 +30,8 @@ const App: React.FC = () => {
 
   const handleAddBrand = (newBrand: Brand) => {
     setBrands([...brands, newBrand]);
+    // Automatically navigate to the new brand's workspace
+    setSelectedBrandId(newBrand.id);
   };
 
   const handleDeleteBrand = (id: string) => {

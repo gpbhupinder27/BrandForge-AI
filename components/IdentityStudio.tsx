@@ -14,11 +14,41 @@ import AssetPreviewModal from './AssetPreviewModal';
 import TagIcon from './icons/TagIcon';
 import ImageIcon from './icons/ImageIcon';
 import BeakerIcon from './icons/BeakerIcon';
+import TemplateIcon from './icons/TemplateIcon';
+import RectangleStackIcon from './icons/RectangleStackIcon';
 
 interface IdentityStudioProps {
   brand: Brand;
   onUpdateBrand: (brand: Brand) => void;
 }
+
+const logoTemplates = [
+    {
+        name: 'Minimalist Geometric',
+        description: 'Clean, modern, and abstract.',
+        prompt: "A minimalist, modern logo for '[Brand Name]'. Use simple geometric shapes like circles, squares, or triangles. The design should be clean, abstract, and memorable.",
+        icon: <RectangleStackIcon className="w-6 h-6" />
+    },
+    {
+        name: 'Elegant Serif',
+        description: 'Classic, sophisticated, and timeless.',
+        prompt: "An elegant and luxurious logo for '[Brand Name]'. Feature the brand name in a classic serif font. The style should be sophisticated and timeless, possibly with a simple monogram or icon.",
+        icon: <TypographyIcon className="w-6 h-6" />
+    },
+    {
+        name: 'Playful Mascot',
+        description: 'Friendly, fun, and approachable character.',
+        prompt: "A fun and friendly mascot logo for '[Brand Name]'. Create a simple, cute character that represents the brand's personality, which is described as '[Brand Description]'. The mascot should be approachable and memorable.",
+        icon: <SparklesIcon className="w-6 h-6" />
+    },
+    {
+        name: 'Abstract Mark',
+        description: 'Dynamic, unique, and conceptual.',
+        prompt: "An abstract, dynamic logo mark for '[Brand Name]'. The design should represent the idea of '[Brand Description]' using flowing lines, unique shapes, or an interesting visual concept. It should be modern and versatile.",
+        icon: <BeakerIcon className="w-6 h-6" />
+    }
+];
+
 
 const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand }) => {
   const [palettePrompt, setPalettePrompt] = useState('');
@@ -65,6 +95,15 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
     setActiveFilters(prev => 
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
+  };
+  
+  const handleTemplateClick = (templatePrompt: string) => {
+    let finalPrompt = templatePrompt;
+    // Replace placeholders with brand-specific details
+    finalPrompt = finalPrompt.replace(/\[Brand Name\]/gi, brand.name);
+    finalPrompt = finalPrompt.replace(/\[Brand Description\]/gi, brand.description);
+
+    setLogoPrompt(finalPrompt);
   };
 
   const handleUpdateAssetTags = (assetId: string, tags: string[]) => {
@@ -209,7 +248,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
         const base64 = await fileToBase64(file);
         const imageInputs = [{ data: base64, mimeType: file.type }];
 
-        const variantPrompt = `Create exactly 2 A/B test variations for the provided logo. The original prompt was: "${baseAsset.prompt}". Generate two distinct versions by making subtle but meaningful changes to either the color scheme, font style, or graphic element. Ensure the brand name '${brand.name}' remains clear. The variations should be different from each other and the original.`;
+        const variantPrompt = `Create exactly 2 A/B test variations for the provided logo. The original prompt was: "${baseAsset.prompt}". Generate two distinct versions that target different potential audiences. For example, one could be more playful and modern for a younger audience, while the other could be more elegant and professional for a corporate audience. The variations should explore different styles (e.g., color, typography, shape) but keep the brand name '${brand.name}' clear.`;
         
         const generatedParts = await generateWithNanoBanana(variantPrompt, imageInputs, 1024, 1024);
         
@@ -222,7 +261,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                 newVariantAssets.push({
                     id: newId,
                     type: 'logo',
-                    prompt: `A/B Variant of: "${baseAsset.prompt}"`,
+                    prompt: `A/B Test Variant (Audience Exploration) of: "${baseAsset.prompt}"`,
                     createdAt: new Date().toISOString(),
                     tags: baseAsset.tags || [],
                     parentId: baseAsset.id,
@@ -323,6 +362,24 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
 
       {/* Step 3: Logo Generation */}
       <Section title="Logo Generation" icon={<SparklesIcon className="w-6 h-6"/>} subtitle="Bring your brand to life with a unique logo." step={3} disabled={!typographyAsset}>
+          <div className="space-y-4 p-4 mb-6 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
+              <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {logoTemplates.map(template => (
+                      <button 
+                          key={template.name} 
+                          onClick={() => handleTemplateClick(template.prompt)} 
+                          disabled={isLoading} 
+                          className="text-left p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{template.name}</span></div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
+                      </button>
+                  ))}
+              </div>
+          </div>
+          
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Or write your own prompt</p>
           <textarea
             value={logoPrompt}
             onChange={(e) => setLogoPrompt(e.target.value)}
@@ -378,7 +435,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                 <p className="text-slate-500 dark:text-slate-400">No logos match your selected filters.</p>
               </div>
             ) : (
-              <div className="space-y-8 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
                 {filteredAssetGroups.map(({ original, variants }) => (
                   <div key={original.id} className="p-4 border border-slate-200 dark:border-slate-700/50 rounded-lg bg-white dark:bg-slate-800/20">
                     <div className="group relative cursor-pointer aspect-square rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50" onClick={() => setPreviewingAsset(original)}>

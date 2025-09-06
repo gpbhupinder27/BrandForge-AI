@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { BrandAsset } from '../types';
 import AsyncImage from './AsyncImage';
 import EditIcon from './icons/EditIcon';
@@ -9,8 +9,8 @@ import BeakerIcon from './icons/BeakerIcon';
 interface AssetPreviewModalProps {
   asset: BrandAsset;
   onClose: () => void;
-  onEdit: (asset: BrandAsset) => void;
-  onDownload: (assetId: string, assetType: string) => void;
+  onEdit?: (asset: BrandAsset) => void;
+  onDownload?: (assetId: string, assetType: string) => void;
   onUpdateTags: (assetId: string, newTags: string[]) => void;
   onGenerateVariants?: (asset: BrandAsset) => void;
   availableTags?: string[];
@@ -52,8 +52,46 @@ const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, o
       }
   };
 
-  const isCreativeAsset = ['poster', 'banner', 'social_ad', 'instagram_story', 'twitter_post'].includes(asset.type);
-  const isLogoAsset = asset.type === 'logo';
+  const isEditableAsset = ['logo', 'poster', 'banner', 'social_ad', 'instagram_story', 'twitter_post', 'youtube_thumbnail'].includes(asset.type);
+  const isDownloadableAsset = isEditableAsset;
+  const isVariantGeneratable = isEditableAsset && !asset.parentId;
+
+  const renderPreviewContent = () => {
+    if (asset.type === 'palette' && asset.palette) {
+        return (
+            <div className="p-6">
+                <h4 className="font-bold text-lg text-slate-900 dark:text-slate-100">{asset.palette.paletteName}</h4>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{asset.palette.description}</p>
+                <div className="flex flex-wrap gap-4">
+                    {asset.palette.colors.map(color => (
+                        <div key={color.hex} className="text-center">
+                            <div className="w-20 h-20 rounded-full border-2 border-slate-200 dark:border-slate-600 shadow-md" style={{ backgroundColor: color.hex }}></div>
+                            <p className="text-sm mt-2 font-mono tracking-tighter text-slate-700 dark:text-slate-300">{color.hex}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{color.name}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+    if (asset.type === 'typography' && asset.typography) {
+        return (
+            <div className="space-y-6 p-6">
+                <div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Headline</p>
+                    <p className="text-4xl font-bold text-slate-900 dark:text-slate-50" style={{fontFamily: asset.typography.headlineFont.name}}>{asset.typography.headlineFont.name}</p>
+                    <p className="text-xs text-slate-500 italic mt-1">{asset.typography.headlineFont.description}</p>
+                </div>
+                 <div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Body</p>
+                    <p className="text-lg text-slate-800 dark:text-slate-200" style={{fontFamily: asset.typography.bodyFont.name}}>The quick brown fox jumps over the lazy dog.</p>
+                    <p className="text-xs text-slate-500 italic mt-1">{asset.typography.bodyFont.description}</p>
+                </div>
+            </div>
+        )
+    }
+    return <AsyncImage assetId={asset.id} alt={`Preview of ${asset.type}`} className="max-w-full max-h-[80vh] object-contain"/>;
+  }
 
   return (
     <div 
@@ -66,8 +104,8 @@ const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, o
         className="bg-white dark:bg-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] shadow-2xl flex flex-col sm:flex-row overflow-hidden"
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
       >
-        <div className="flex-1 bg-slate-100 dark:bg-slate-900/50 flex items-center justify-center p-4">
-             <AsyncImage assetId={asset.id} alt={`Preview of ${asset.type}`} className="max-w-full max-h-[80vh] object-contain"/>
+        <div className="flex-1 bg-slate-100 dark:bg-slate-900/50 flex items-center justify-center p-4 overflow-auto">
+             {renderPreviewContent()}
         </div>
         <div className="w-full sm:w-80 p-6 flex flex-col bg-white dark:bg-slate-800">
             <div className="flex justify-between items-start">
@@ -115,17 +153,21 @@ const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, o
             </div>
 
             <div className="mt-auto pt-6 flex flex-col gap-3">
-                {(isCreativeAsset || isLogoAsset) && !asset.parentId && onGenerateVariants && (
+                {isVariantGeneratable && onGenerateVariants && (
                   <button onClick={() => onGenerateVariants(asset)} className="w-full text-sm flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-500 transition-colors">
                       <BeakerIcon className="w-4 h-4" /> Generate A/B Variants
                   </button>
                 )}
-                <button onClick={() => onEdit(asset)} className="w-full text-sm flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500 transition-colors">
-                    <EditIcon className="w-4 h-4" /> Edit
-                </button>
-                <button onClick={() => onDownload(asset.id, asset.type)} className="w-full text-sm flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 px-4 py-2 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">
-                    <DownloadIcon className="w-4 h-4" /> Download
-                </button>
+                {isEditableAsset && onEdit && (
+                    <button onClick={() => onEdit(asset)} className="w-full text-sm flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-500 transition-colors">
+                        <EditIcon className="w-4 h-4" /> Edit
+                    </button>
+                )}
+                {isDownloadableAsset && onDownload && (
+                    <button onClick={() => onDownload(asset.id, asset.type)} className="w-full text-sm flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 px-4 py-2 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">
+                        <DownloadIcon className="w-4 h-4" /> Download
+                    </button>
+                )}
                  <button onClick={onClose} className="w-full mt-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Close</button>
             </div>
         </div>

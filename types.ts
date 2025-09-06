@@ -1,4 +1,4 @@
-export type AssetType = 'logo' | 'palette' | 'typography' | 'poster' | 'banner' | 'social_ad' | 'instagram_story' | 'twitter_post';
+export type AssetType = 'logo' | 'palette' | 'typography' | 'poster' | 'banner' | 'social_ad' | 'instagram_story' | 'twitter_post' | 'youtube_thumbnail';
 
 export interface ColorInfo {
   hex: string;
@@ -14,6 +14,12 @@ export interface ColorPalette {
 export interface TypographyPairing {
   headlineFont: { name: string; description: string; };
   bodyFont: { name: string; description: string; };
+}
+
+export interface CustomTemplate {
+  id: string;
+  name: string;
+  prompt: string;
 }
 
 export interface BrandAsset {
@@ -35,6 +41,7 @@ export interface Brand {
   description: string;
   assets: BrandAsset[];
   createdAt: string;
+  customTemplates?: CustomTemplate[];
 }
 
 export interface GeneratedImagePart {
