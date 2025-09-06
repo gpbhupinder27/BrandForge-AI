@@ -1,4 +1,4 @@
-export type AssetType = 'logo' | 'palette' | 'typography' | 'poster' | 'banner' | 'social_ad' | 'instagram_story' | 'twitter_post' | 'youtube_thumbnail';
+export type AssetType = 'logo' | 'palette' | 'typography' | 'poster' | 'banner' | 'social_ad' | 'instagram_story' | 'twitter_post' | 'youtube_thumbnail' | 'video_ad';
 
 export interface ColorInfo {
   hex: string;
@@ -33,6 +33,8 @@ export interface BrandAsset {
   tags?: string[];
   parentId?: string; // ID of the original asset this is a variation of
   variantLabel?: string; // e.g., 'Variant A', 'B', etc.
+  sourceVideoIds?: string[]; // For edited videos, the IDs of the source clips
+  editedDetails?: string; // A description of the edits made
 }
 
 export interface Brand {

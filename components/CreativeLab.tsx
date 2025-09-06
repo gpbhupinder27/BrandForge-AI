@@ -13,7 +13,6 @@ import TemplateIcon from './icons/TemplateIcon';
 import BookmarkIcon from './icons/BookmarkIcon';
 import TrashIcon from './icons/TrashIcon';
 import XMarkIcon from './icons/XMarkIcon';
-// Fix: Import missing icon components
 import ChatBubbleIcon from './icons/ChatBubbleIcon';
 import BeakerIcon from './icons/BeakerIcon';
 

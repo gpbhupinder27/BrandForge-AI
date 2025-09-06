@@ -1,6 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Brand, BrandAsset } from '../types';
-// Fix: Import `generatePromptSuggestions` to be used for suggesting prompts.
 import { generateWithNanoBanana, fileToBase64, generateTagsForCreative, describeImage, generatePromptSuggestions, generateThumbnailElementSuggestions } from '../services/geminiService';
 import { storeImage, getImage } from '../services/imageDb';
 import Loader from './Loader';
@@ -670,7 +669,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                                                  {(['left', 'center', 'right'] as EditingTextAlign[]).map(align => (
                                                     <button key={align} onClick={() => setEditingTextAlign(align)} className={`w-1/3 flex justify-center items-center rounded p-1 transition-colors ${editingTextAlign === align ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-300'}`}>
                                                         {align === 'left' && <TextAlignLeftIcon className="w-5 h-5" />}
-                                                        {align === 'center' && <TextAlignCenterIcon className="w-5 h-5" />}
+                                                        {align === 'center' && <TextAlignCenterIcon className="w-5 h-s" />}
                                                         {align === 'right' && <TextAlignRightIcon className="w-5 h-5" />}
                                                     </button>
                                                 ))}

@@ -11,6 +11,7 @@ import { storeImage, getImage } from '../services/imageDb';
 import Loader from './Loader';
 import ClipboardIcon from './icons/ClipboardIcon';
 import WandIcon from './icons/WandIcon';
+import AsyncVideo from './AsyncVideo';
 
 interface AssetDetailViewProps {
   asset: BrandAsset;
@@ -28,7 +29,8 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
     social_ad: 'Social Ad',
     instagram_story: 'Instagram Story',
     twitter_post: 'Twitter Post',
-    youtube_thumbnail: 'YouTube Thumbnail'
+    youtube_thumbnail: 'YouTube Thumbnail',
+    video_ad: 'Video Ad',
 };
 
 const QUICK_EDITS = [
@@ -81,14 +83,18 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
     };
     
     const handleDownload = async () => {
-        const imageUrl = await getImage(asset.id);
-        if (!imageUrl) {
-            setError("Could not find image to download.");
+        const dataUrl = await getImage(asset.id);
+        if (!dataUrl) {
+            setError("Could not find asset to download.");
             return;
         }
-        const filename = `${brand.name}-${asset.type}-${asset.id.slice(0, 6)}.png`;
+        
+        const isVideo = asset.type === 'video_ad';
+        const fileExtension = isVideo ? 'mp4' : 'png';
+        const filename = `${brand.name}-${asset.type}-${asset.id.slice(0, 6)}.${fileExtension}`;
+        
         const link = document.createElement('a');
-        link.href = imageUrl;
+        link.href = dataUrl;
         link.download = filename;
         document.body.appendChild(link);
         link.click();
@@ -97,6 +103,10 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
 
     const handleCopy = async () => {
         setError(null);
+        if (asset.type === 'video_ad') {
+            setError("Copying videos is not supported.");
+            return;
+        }
         const imageUrl = await getImage(asset.id);
         if (!imageUrl) {
             setError("Could not find image to copy.");
@@ -241,6 +251,9 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                 </div>
             )
         }
+        if (asset.type === 'video_ad') {
+            return <AsyncVideo assetId={asset.id} className="max-w-full max-h-[75vh] object-contain" />;
+        }
         return <AsyncImage assetId={asset.id} alt={`Preview of ${asset.type}`} className="max-w-full max-h-[75vh] object-contain"/>;
     };
 
@@ -338,23 +351,23 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                         {error && <p className="mt-4 text-center text-red-500 dark:text-red-400">Error: {error}</p>}
 
                         <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 flex flex-col gap-3">
-                            {isActionableAsset && (
-                                <>
-                                    {isVariantGeneratable && (
-                                        <button onClick={() => handleGenerateAction('variants')} disabled={isLoading} className="w-full text-sm flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-500 transition-colors disabled:opacity-50">
-                                            <BeakerIcon className="w-4 h-4" /> Generate A/B Variants
-                                        </button>
-                                    )}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button onClick={handleCopy} disabled={isCopied} className="w-full text-sm flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 px-4 py-2 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-green-200 dark:disabled:bg-green-800 disabled:text-green-800 dark:disabled:text-green-100">
-                                            <ClipboardIcon className="w-4 h-4" /> {isCopied ? 'Copied!' : 'Copy'}
-                                        </button>
-                                        <button onClick={handleDownload} className="w-full text-sm flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 px-4 py-2 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">
-                                            <DownloadIcon className="w-4 h-4" /> Download
-                                        </button>
-                                    </div>
-                                </>
+                            {isVariantGeneratable && (
+                                <button onClick={() => handleGenerateAction('variants')} disabled={isLoading} className="w-full text-sm flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-500 transition-colors disabled:opacity-50">
+                                    <BeakerIcon className="w-4 h-4" /> Generate A/B Variants
+                                </button>
                             )}
+                             <div className="grid grid-cols-2 gap-3">
+                                <button 
+                                    onClick={handleCopy} 
+                                    disabled={isCopied || asset.type === 'video_ad'} 
+                                    className="w-full text-sm flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 px-4 py-2 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-green-200 dark:disabled:bg-green-800 disabled:text-green-800 dark:disabled:text-green-100 disabled:cursor-not-allowed"
+                                >
+                                    <ClipboardIcon className="w-4 h-4" /> {isCopied ? 'Copied!' : 'Copy'}
+                                </button>
+                                <button onClick={handleDownload} className="w-full text-sm flex items-center justify-center gap-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 px-4 py-2 rounded-md hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">
+                                    <DownloadIcon className="w-4 h-4" /> Download
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

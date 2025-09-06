@@ -6,6 +6,7 @@ import SwitchVerticalIcon from './icons/SwitchVerticalIcon';
 import XMarkIcon from './icons/XMarkIcon';
 import ImageIcon from './icons/ImageIcon';
 import ExportIcon from './icons/ExportIcon';
+import PlayIcon from './icons/PlayIcon';
 
 interface AssetLibraryProps {
   brand: Brand;
@@ -24,7 +25,8 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
     social_ad: 'Social Ad',
     instagram_story: 'Instagram Story',
     twitter_post: 'Twitter Post',
-    youtube_thumbnail: 'YouTube Thumbnail'
+    youtube_thumbnail: 'YouTube Thumbnail',
+    video_ad: 'Video Ad',
 };
 
 
@@ -53,6 +55,16 @@ const AssetCard: React.FC<{ asset: BrandAsset; onClick: () => void; }> = ({ asse
                         The quick brown fox jumps over the lazy dog.
                     </p>
                 </div>
+            );
+        }
+        if (asset.type === 'video_ad' && asset.parentId) {
+             return (
+                <>
+                    <AsyncImage assetId={asset.parentId} alt={asset.prompt} className="w-full h-full object-contain p-2" />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <PlayIcon className="w-12 h-12 text-white/80" />
+                    </div>
+                </>
             );
         }
         // For logos, creatives, and other image-based assets
@@ -89,6 +101,7 @@ const AssetLibrary: React.FC<AssetLibraryProps> = ({ brand, onSelectAsset, onExp
         assets.sort((a, b) => {
             const dateA = new Date(a.createdAt).getTime();
             const dateB = new Date(b.createdAt).getTime();
+            // FIX: Corrected typo from `b` to `dateB` for proper date comparison.
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
         });
         return assets;
