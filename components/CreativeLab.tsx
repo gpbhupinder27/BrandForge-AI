@@ -102,6 +102,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
   const [campaignSuggestionLoadingMessage, setCampaignSuggestionLoadingMessage] = useState('Thinking...');
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [latestCampaignAssets, setLatestCampaignAssets] = useState<BrandAsset[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const campaignFileInputRef = useRef<HTMLInputElement>(null);
   
@@ -153,15 +154,6 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
         asset.id === assetId ? { ...asset, tags } : asset
     );
     onUpdateBrand({ ...brand, assets: updatedAssets });
-  };
-
-  const handleAddAssets = (newAssets: BrandAsset[]) => {
-    if (newAssets.length === 0) return;
-    const updatedBrand = {
-      ...brand,
-      assets: [...brand.assets, ...newAssets],
-    };
-    onUpdateBrand(updatedBrand);
   };
 
   const handleCampaignTypeToggle = (type: AssetType) => {
@@ -223,7 +215,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     e.stopPropagation();
   };
 
-  const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, logoPos: LogoPosition | null, baseAsset?: BrandAsset) => {
+  const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, logoPos: LogoPosition | null, baseAsset?: BrandAsset): Promise<BrandAsset[]> => {
     if (!logoAsset) {
         throw new Error("Please generate a logo in the Identity Studio before creating marketing assets.");
     }
@@ -291,7 +283,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
           });
         }
     }
-    handleAddAssets(assetsToCreate);
+    return assetsToCreate;
   };
   
   const handleGenerate = async (baseAsset?: BrandAsset) => {
@@ -304,7 +296,10 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     setLoadingMessage("Crafting your creative...");
 
     try {
-        await runGeneration(currentPrompt, currentType, productImage, logoPosition, baseAsset);
+        const newAssets = await runGeneration(currentPrompt, currentType, productImage, logoPosition, baseAsset);
+        if (newAssets.length > 0) {
+            onUpdateBrand({ ...brand, assets: [...brand.assets, ...newAssets] });
+        }
         setPrompt('');
         setProductImage(null);
         if(fileInputRef.current) fileInputRef.current.value = "";
@@ -324,19 +319,26 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     setError(null);
 
     const campaignAssetsToGenerate = campaignAssets.filter(asset => selectedCampaignTypes.includes(asset.type));
+    const allNewAssets: BrandAsset[] = [];
 
     for (let i = 0; i < campaignAssetsToGenerate.length; i++) {
         const asset = campaignAssetsToGenerate[i];
         setLoadingMessage(`Generating Campaign (${i+1}/${campaignAssetsToGenerate.length}): ${asset.label}...`);
         try {
             const campaignAssetPrompt = `Generate a ${asset.label} for the following campaign: "${campaignPrompt}".`;
-            // For campaign assets, use the default (unspecified) logo position by passing null.
-            await runGeneration(campaignAssetPrompt, asset.type, campaignImage, null);
+            const newAssets = await runGeneration(campaignAssetPrompt, asset.type, campaignImage, null);
+            allNewAssets.push(...newAssets);
         } catch(err) {
             setError(err instanceof Error ? `Failed on ${asset.label}: ${err.message}` : `An unknown error occurred during ${asset.label} generation.`);
             break; 
         }
     }
+    
+    if (allNewAssets.length > 0) {
+        onUpdateBrand({ ...brand, assets: [...brand.assets, ...allNewAssets] });
+        setLatestCampaignAssets(allNewAssets);
+    }
+
     setCampaignPrompt('');
     setCampaignImage(null);
     if(campaignFileInputRef.current) campaignFileInputRef.current.value = "";
@@ -442,7 +444,12 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
             ? "Marketing Campaign" 
             : creativeTypeOptions.find(opt => opt.type === creativeType)?.label || "Creative Asset";
 
-        const generatedSuggestions = await generatePromptSuggestions(creativeTypeLabel, brand.description, imageDescription);
+        const generatedSuggestions = await generatePromptSuggestions(
+            creativeTypeLabel, 
+            brand.description, 
+            imageDescription,
+            paletteAsset?.palette
+        );
         
         if (isCampaign) {
             setCampaignSuggestions(generatedSuggestions);
@@ -897,6 +904,34 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                     <button onClick={handleSaveCustomTemplate} disabled={!newTemplateName.trim()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50">
                         <BookmarkIcon className="w-5 h-5"/>
                         Save Template
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {latestCampaignAssets && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setLatestCampaignAssets(null)}>
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Campaign Pack Generated!</h2>
+                    <button onClick={() => setLatestCampaignAssets(null)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
+                        <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
+                    </button>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+                    {latestCampaignAssets.map(asset => (
+                         <div key={asset.id} className="group relative aspect-square rounded-lg bg-slate-100 dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700/50 cursor-pointer" onClick={() => setPreviewingAsset(asset)}>
+                            <AsyncImage assetId={asset.id} alt="Generated campaign creative" className="w-full h-full object-contain p-2"/>
+                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                                <p className="text-xs font-semibold text-white capitalize truncate">{asset.type.replace(/_/g, ' ')}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                 <div className="flex justify-end mt-6">
+                    <button onClick={() => setLatestCampaignAssets(null)} className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500">
+                        Done
                     </button>
                 </div>
             </div>

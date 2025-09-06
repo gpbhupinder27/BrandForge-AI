@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality, Type, GenerateContentResponse } from "@google/genai";
-import { GeneratedPart } from '../types';
+import { GeneratedPart, ColorPalette } from '../types';
 
 if (!process.env.API_KEY) {
     console.warn("API_KEY environment variable not set. Please set your API key for the app to function.");
@@ -143,15 +143,24 @@ export const describeImage = async (imageBase64: string, mimeType: string): Prom
 export const generatePromptSuggestions = async (
     creativeTypeLabel: string, 
     brandDescription: string, 
-    imageDescription?: string
+    imageDescription?: string,
+    palette?: ColorPalette | null
 ): Promise<{ goal: string; prompt: string; }[]> => {
     
     const imageContext = imageDescription 
         ? `The creative will incorporate an image described as: "${imageDescription}". The prompt should leverage this image.` 
         : "The creative will be generated from scratch based on the prompt.";
 
+    const paletteContext = palette
+        ? `The brand's color palette is described as "${palette.description}" and features colors like ${palette.colors.map(c => c.name).join(', ')}. The suggested prompts should align with this visual mood.`
+        : '';
+
     const prompt = `
-        You are an expert marketing strategist. A user is creating a "${creativeTypeLabel}" for a brand described as: "${brandDescription}". 
+        You are an expert marketing strategist. A user is creating a "${creativeTypeLabel}" for a brand with the following identity:
+        - Brand Description: "${brandDescription}"
+        ${paletteContext}
+
+        Context for the creative:
         ${imageContext}
         
         Generate a list of 3 distinct and compelling prompt ideas for the user. Each prompt should be tailored to a different marketing goal (e.g., a sale, a new product announcement, building brand engagement). The prompts should be concise, creative, and ready for an AI image generator.
@@ -186,16 +195,23 @@ export const generateThumbnailElementSuggestions = async (
     emotion: string,
     overlayText: string,
     baseImagePrompt: string,
-    imageDescription: string
+    imageDescription: string,
+    brandDescription: string,
+    palette: ColorPalette | null
 ): Promise<string[]> => {
+    
+    const brandContext = `The brand is about: "${brandDescription}".`;
+    const paletteContext = palette ? `The brand's color palette is described as "${palette.description}". The suggestions should complement these colors.` : '';
+
     const prompt = `
         You are an expert YouTube thumbnail designer. A user is creating a thumbnail with the following attributes:
+        - Brand Identity: ${brandContext} ${paletteContext}
         - Style: "${style}"
         - Human Emotion to Convey: "${emotion}"
         - Overlay Text: "${overlayText || 'Not specified'}"
         - Base Image Concept: "${baseImagePrompt || imageDescription || 'Not specified'}"
 
-        Based on this context, suggest 3-5 simple, high-impact graphical elements to add to the *base image prompt* to make the thumbnail more engaging and clickable. The suggestions should complement the specified style and emotion. For example, for 'Vibrant & Energetic' and 'Excited', you might suggest 'exploding stars' or 'dynamic speed lines'. For 'Dark & Moody' and 'Serious', you might suggest 'a subtle lens flare' or 'a gritty texture overlay'.
+        Based on this full context, suggest 3-5 simple, high-impact graphical elements to add to the *base image prompt* to make the thumbnail more engaging and clickable. The suggestions should complement the brand identity, specified style, and emotion. For example, for 'Vibrant & Energetic' and 'Excited', you might suggest 'exploding stars' or 'dynamic speed lines'. For 'Dark & Moody' and 'Serious', you might suggest 'a subtle lens flare' or 'a gritty texture overlay'.
 
         Return the suggestions as a JSON array of short, descriptive strings.
     `;

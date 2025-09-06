@@ -24,6 +24,8 @@ import VlogIcon from './icons/VlogIcon';
 import TextAlignLeftIcon from './icons/TextAlignLeftIcon';
 import TextAlignCenterIcon from './icons/TextAlignCenterIcon';
 import TextAlignRightIcon from './icons/TextAlignRightIcon';
+import TemplateIcon from './icons/TemplateIcon';
+
 
 interface ThumbnailStudioProps {
   brand: Brand;
@@ -113,6 +115,30 @@ const thumbnailTemplates = [
         style: 'Default',
         emotion: 'Happy',
     },
+    {
+        name: 'Special Offer',
+        icon: <SparklesIcon className="w-8 h-8" />,
+        prompt: "A bold, attention-grabbing thumbnail for a sale or special offer. Prominently feature a discount percentage like '50% OFF!' or text like 'LIMITED TIME'. Use high-contrast colors and a sense of urgency.",
+        overlayText: '50% OFF TODAY!',
+        style: 'Vibrant & Energetic',
+        emotion: 'Excited',
+    },
+    {
+        name: 'Brand Teaser',
+        icon: <MovieIcon className="w-8 h-8" />,
+        prompt: 'A cinematic and intriguing thumbnail teasing a brand story or documentary-style video. Use a dramatic, high-quality image related to the brand\'s origin or mission.',
+        overlayText: 'OUR STORY',
+        style: 'Cinematic',
+        emotion: 'Curious',
+    },
+    {
+        name: 'Product Demo',
+        icon: <TechIcon className="w-8 h-8" />,
+        prompt: 'A clean, crisp thumbnail showing a key product in action or a close-up of its main feature, against a simple, non-distracting background.',
+        overlayText: 'SEE IT IN ACTION',
+        style: 'Minimal & Clean',
+        emotion: 'Happy',
+    }
 ];
 
 const inputClasses = "w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100 transition-shadow";
@@ -148,6 +174,8 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     
     const [suggestedElements, setSuggestedElements] = useState<string[]>([]);
     const [isSuggestingElements, setIsSuggestingElements] = useState(false);
+    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -173,6 +201,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
         setStyle(template.style);
         setEmotion(template.emotion);
         setComposition('Default');
+        setIsTemplateModalOpen(false);
     };
     
     const handleSuggestPrompts = async () => {
@@ -185,7 +214,12 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 const base64 = await fileToBase64(baseImageFile);
                 imageDescription = await describeImage(base64, baseImageFile.type);
             }
-            const generatedSuggestions = await generatePromptSuggestions("YouTube Thumbnail", brand.description, imageDescription);
+            const generatedSuggestions = await generatePromptSuggestions(
+                "YouTube Thumbnail", 
+                brand.description, 
+                imageDescription,
+                paletteAsset?.palette
+            );
             setSuggestions(generatedSuggestions);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An unknown error occurred.');
@@ -204,7 +238,15 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 const base64 = await fileToBase64(baseImageFile);
                 imageDescription = await describeImage(base64, baseImageFile.type);
             }
-            const result = await generateThumbnailElementSuggestions(style, emotion, overlayText, baseImagePrompt, imageDescription);
+            const result = await generateThumbnailElementSuggestions(
+                style, 
+                emotion, 
+                overlayText, 
+                baseImagePrompt, 
+                imageDescription,
+                brand.description,
+                paletteAsset?.palette
+            );
             setSuggestedElements(result || []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to get suggestions.');
@@ -447,15 +489,14 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Thumbnail Studio</h3>
                 
                 <div>
-                    <h4 className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Start with a Template</h4>
-                    <div className="grid grid-cols-3 gap-2">
-                        {thumbnailTemplates.map(template => (
-                             <button key={template.name} onClick={() => handleTemplateClick(template)} disabled={isLoading} title={template.name} className="flex flex-col items-center justify-center text-center gap-2 p-2 aspect-square bg-slate-100 dark:bg-slate-700/50 rounded-md border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 disabled:opacity-50">
-                                 <div className="text-indigo-600 dark:text-indigo-400">{template.icon}</div>
-                                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-tight">{template.name}</p>
-                             </button>
-                        ))}
-                    </div>
+                     <button 
+                        onClick={() => setIsTemplateModalOpen(true)} 
+                        disabled={isLoading}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 font-semibold bg-slate-100 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                    >
+                        <TemplateIcon className="w-5 h-5" />
+                        Browse Templates
+                    </button>
                 </div>
 
                 <div>
@@ -576,6 +617,27 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                     </div>
                  )}
             </div>
+            
+            {isTemplateModalOpen && (
+                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsTemplateModalOpen(false)}>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Templates</h2>
+                            <button onClick={() => setIsTemplateModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
+                                <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+                            {thumbnailTemplates.map(template => (
+                                 <button key={template.name} onClick={() => handleTemplateClick(template)} disabled={isLoading} title={template.name} className="flex flex-col items-center justify-center text-center gap-2 p-3 aspect-square bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 disabled:opacity-50 hover:-translate-y-1">
+                                     <div className="text-indigo-600 dark:text-indigo-400">{template.icon}</div>
+                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-tight">{template.name}</p>
+                                 </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {previewingAsset && (
                 <AssetPreviewModal
