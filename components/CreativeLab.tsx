@@ -85,7 +85,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
   const [campaignPrompt, setCampaignPrompt] = useState('');
   const [selectedCampaignTypes, setSelectedCampaignTypes] = useState<AssetType[]>(['social_ad']);
   const [creativeType, setCreativeType] = useState<AssetType>('social_ad');
-  const [logoPosition, setLogoPosition] = useState<LogoPosition | null>('top-right');
+  const [logoPosition, setLogoPosition] = useState<LogoPosition>('top-right');
   const [productImage, setProductImage] = useState<File | null>(null);
   const [campaignImage, setCampaignImage] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -658,10 +658,10 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo Position (Optional)</label>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo Position</label>
                             <div className="flex flex-wrap gap-2">
                                 {(['top-right', 'top-left', 'bottom-right', 'bottom-left', 'watermark', 'none'] as LogoPosition[]).map(pos => (
-                                    <button key={pos} onClick={() => setLogoPosition(logoPosition === pos ? null : pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
+                                    <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
                                         {pos.replace('-', ' ')}
                                     </button>
                                 ))}

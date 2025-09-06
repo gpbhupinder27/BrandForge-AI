@@ -18,6 +18,13 @@ import TravelIcon from './icons/TravelIcon';
 import WandIcon from './icons/WandIcon';
 import UndoIcon from './icons/UndoIcon';
 import RedoIcon from './icons/RedoIcon';
+import DIYIcon from './icons/DIYIcon';
+import ProductivityIcon from './icons/ProductivityIcon';
+import MovieIcon from './icons/MovieIcon';
+import VlogIcon from './icons/VlogIcon';
+import TextAlignLeftIcon from './icons/TextAlignLeftIcon';
+import TextAlignCenterIcon from './icons/TextAlignCenterIcon';
+import TextAlignRightIcon from './icons/TextAlignRightIcon';
 
 interface ThumbnailStudioProps {
   brand: Brand;
@@ -26,6 +33,9 @@ interface ThumbnailStudioProps {
 
 type LogoPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'watermark' | 'none';
 type EditSession = { history: BrandAsset[]; currentIndex: number };
+type EditingFontSize = 'medium' | 'large' | 'extra large';
+type EditingTextAlign = 'left' | 'center' | 'right';
+
 
 const thumbnailStyles = ['Default', 'Vibrant & Energetic', 'Minimal & Clean', 'Dark & Moody', 'Cinematic', 'Retro / Vintage'];
 const compositionRules = ['Default', 'Rule of Thirds: Subject Left', 'Rule of Thirds: Subject Right', 'Center-Focused'];
@@ -72,6 +82,38 @@ const thumbnailTemplates = [
         style: 'Cinematic',
         emotion: 'Shocked / Surprised',
     },
+    {
+        name: 'DIY Tutorial',
+        icon: <DIYIcon className="w-8 h-8" />,
+        prompt: "A person's hands working on a craft project on a clean, well-lit workbench, with tools neatly arranged.",
+        overlayText: 'DIY PROJECT: STEP-BY-STEP',
+        style: 'Minimal & Clean',
+        emotion: 'Serious / Focused',
+    },
+    {
+        name: 'Productivity Hack',
+        icon: <ProductivityIcon className="w-8 h-8" />,
+        prompt: 'A minimalist desk setup with a laptop, notebook, and a single plant. A stylized brain graphic with glowing lines.',
+        overlayText: '5 HACKS TO 10X YOUR FOCUS',
+        style: 'Vibrant & Energetic',
+        emotion: 'Serious / Focused',
+    },
+    {
+        name: 'Movie Review',
+        icon: <MovieIcon className="w-8 h-8" />,
+        prompt: 'A cinematic composition featuring elements from a popular movie, with a dark and moody atmosphere and dramatic lighting.',
+        overlayText: 'THE ENDING EXPLAINED',
+        style: 'Cinematic',
+        emotion: 'Curious',
+    },
+    {
+        name: 'Personal Vlog',
+        icon: <VlogIcon className="w-8 h-8" />,
+        prompt: 'A close-up, friendly portrait of a person talking directly to the camera, with a slightly blurred background of their room.',
+        overlayText: 'MY WEEKLY UPDATE',
+        style: 'Default',
+        emotion: 'Happy',
+    },
 ];
 
 const inputClasses = "w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100 transition-shadow";
@@ -94,10 +136,16 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     const [editSession, setEditSession] = useState<EditSession | null>(null);
     const [editPrompt, setEditPrompt] = useState('');
     
+    // Editing Controls State
     const [editingBrightness, setEditingBrightness] = useState(100);
     const [editingContrast, setEditingContrast] = useState(100);
+    const [editingSaturation, setEditingSaturation] = useState(100);
     const [editingLogoOpacity, setEditingLogoOpacity] = useState(100);
     const [editingTextOpacity, setEditingTextOpacity] = useState(100);
+    const [editingFontSize, setEditingFontSize] = useState<EditingFontSize>('large');
+    const [editingTextAlign, setEditingTextAlign] = useState<EditingTextAlign>('center');
+    const [editingTextOutline, setEditingTextOutline] = useState(false);
+
     
     const [suggestedElements, setSuggestedElements] = useState<string[]>([]);
     const [isSuggestingElements, setIsSuggestingElements] = useState(false);
@@ -278,7 +326,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     };
     
     const handleEditThumbnail = async () => {
-        if (!editSession || !editPrompt.trim() || !logoAsset) {
+        if (!editSession || !logoAsset) {
             setError("Missing information to edit thumbnail.");
             return;
         }
@@ -312,11 +360,31 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
             imageInputs.push({ data: base64, mimeType: baseFile.type });
 
             let editInstructions = [editPrompt];
+            
+            // Image adjustments
             if (editingBrightness !== 100) editInstructions.push(`adjust the overall brightness to ${editingBrightness}%`);
             if (editingContrast !== 100) editInstructions.push(`adjust the overall contrast to ${editingContrast}%`);
+            if (editingSaturation !== 100) editInstructions.push(`adjust the image saturation to ${editingSaturation}%`);
             if (editingLogoOpacity !== 100) editInstructions.push(`make the brand logo ${editingLogoOpacity}% opaque`);
-            if (editingTextOpacity !== 100) editInstructions.push(`make the overlay text ${editingTextOpacity}% opaque`);
+            
+            // Text adjustments
+            let textAdjustments = [];
+            if (editingTextOpacity !== 100) textAdjustments.push(`${editingTextOpacity}% opaque`);
+            textAdjustments.push(`font size should be ${editingFontSize}`);
+            textAdjustments.push(`aligned ${editingTextAlign}`);
+            if (editingTextOutline) textAdjustments.push(`with a thin black outline`);
+            
+            if(textAdjustments.length > 0) {
+                editInstructions.push(`make the overlay text ${textAdjustments.join(', ')}`);
+            }
+
             const combinedEditPrompt = editInstructions.filter(Boolean).join(', ');
+
+            if (!combinedEditPrompt) {
+                setError("No edits were specified.");
+                setIsLoading(false);
+                return;
+            }
 
             const paletteInfo = paletteAsset?.palette ? `Use the brand's color palette (${paletteAsset.palette.colors.map(c => c.hex).join(', ')}) to ensure brand consistency.` : '';
             const finalPrompt = `Edit the provided YouTube thumbnail based on the user's request: "${combinedEditPrompt}". The original context was: "${editingAsset.prompt}". The image is for a brand named "${brand.name}". ${paletteInfo} Ensure the brand logo remains clearly visible if it exists.`;
@@ -334,9 +402,9 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                     const newAsset: BrandAsset = {
                         id: newId,
                         type: 'youtube_thumbnail',
-                        prompt: editPrompt,
+                        prompt: combinedEditPrompt,
                         createdAt: new Date().toISOString(),
-                        tags: tags,
+                        tags: editingAsset.tags || [],
                     };
                     newAssets.push(newAsset);
 
@@ -351,7 +419,6 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
             if (newAssets.length === 0) throw new Error("The AI did not return an edited image.");
 
             onUpdateBrand({ ...brand, assets: [...brand.assets, ...newAssets] });
-            // Do not close modal automatically, allow undo/redo
             
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An unknown error occurred during edit.');
@@ -524,6 +591,10 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                         setEditingContrast(100);
                         setEditingLogoOpacity(100);
                         setEditingTextOpacity(100);
+                        setEditingSaturation(100);
+                        setEditingFontSize('large');
+                        setEditingTextAlign('center');
+                        setEditingTextOutline(false);
                     }}
                     onUpdateTags={handleUpdateAssetTags}
                     availableTags={allThumbnailTags}
@@ -531,8 +602,8 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
             )}
 
             {editSession && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-fade-in">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-3xl w-full shadow-2xl border border-slate-200 dark:border-slate-700">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Edit Thumbnail</h3>
                             <div className="flex items-center gap-2">
@@ -542,40 +613,83 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                                 <button onClick={handleRedo} disabled={isLoading || editSession.currentIndex >= editSession.history.length - 1} title="Redo" className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed">
                                     <RedoIcon className="w-5 h-5" />
                                 </button>
+                                 <button onClick={() => setEditSession(null)} disabled={isLoading} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
+                                    <XMarkIcon className="w-5 h-5" />
+                                </button>
                             </div>
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-6 items-start">
-                            <div className="w-48 aspect-video bg-slate-100 dark:bg-slate-700 rounded-md p-1 flex-shrink-0">
-                                <AsyncImage assetId={editSession.history[editSession.currentIndex].id} alt="thumbnail to edit" className="w-full h-full object-contain"/>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="md:col-span-1 flex flex-col items-center justify-center">
+                                <div className="w-full aspect-video bg-slate-100 dark:bg-slate-700 rounded-md p-1">
+                                    <AsyncImage assetId={editSession.history[editSession.currentIndex].id} alt="thumbnail to edit" className="w-full h-full object-contain"/>
+                                </div>
                             </div>
-                            <div className="flex-1 space-y-4">
+                            <div className="md:col-span-1 space-y-4">
                                 <div>
-                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Describe your changes:</label>
+                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Conversational Edit:</label>
                                     <textarea value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="e.g., Make the text red, add a shocked face" className={inputClasses} rows={2} disabled={isLoading} />
                                 </div>
-                                <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-2">
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Brightness <span>{editingBrightness}%</span></label>
-                                        <input type="range" min="50" max="150" value={editingBrightness} onChange={e => setEditingBrightness(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                
+                                <div className="space-y-4 pt-2">
+                                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Image Adjustments</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Brightness <span>{editingBrightness}%</span></label>
+                                            <input type="range" min="50" max="150" value={editingBrightness} onChange={e => setEditingBrightness(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                                        </div>
+                                         <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Contrast <span>{editingContrast}%</span></label>
+                                            <input type="range" min="50" max="150" value={editingContrast} onChange={e => setEditingContrast(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                                        </div>
+                                         <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Saturation <span>{editingSaturation}%</span></label>
+                                            <input type="range" min="0" max="200" value={editingSaturation} onChange={e => setEditingSaturation(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Logo Opacity <span>{editingLogoOpacity}%</span></label>
+                                            <input type="range" min="0" max="100" value={editingLogoOpacity} onChange={e => setEditingLogoOpacity(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                                        </div>
                                     </div>
-                                     <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Contrast <span>{editingContrast}%</span></label>
-                                        <input type="range" min="50" max="150" value={editingContrast} onChange={e => setEditingContrast(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Logo Opacity <span>{editingLogoOpacity}%</span></label>
-                                        <input type="range" min="0" max="100" value={editingLogoOpacity} onChange={e => setEditingLogoOpacity(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" />
-                                    </div>
-                                     <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Text Opacity <span>{editingTextOpacity}%</span></label>
-                                        <input type="range" min="0" max="100" value={editingTextOpacity} onChange={e => setEditingTextOpacity(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" />
+                                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 pt-2">Text Adjustments</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 flex justify-between">Text Opacity <span>{editingTextOpacity}%</span></label>
+                                            <input type="range" min="0" max="100" value={editingTextOpacity} onChange={e => setEditingTextOpacity(Number(e.target.value))} className="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1 block">Font Size</label>
+                                            <div className="flex bg-slate-200 dark:bg-slate-700 rounded-md p-1">
+                                                {(['medium', 'large', 'extra large'] as EditingFontSize[]).map(size => (
+                                                    <button key={size} onClick={() => setEditingFontSize(size)} className={`w-1/3 text-xs font-semibold capitalize rounded p-1 transition-colors ${editingFontSize === size ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-300'}`}>{size}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1 block">Alignment</label>
+                                            <div className="flex bg-slate-200 dark:bg-slate-700 rounded-md p-1">
+                                                 {(['left', 'center', 'right'] as EditingTextAlign[]).map(align => (
+                                                    <button key={align} onClick={() => setEditingTextAlign(align)} className={`w-1/3 flex justify-center items-center rounded p-1 transition-colors ${editingTextAlign === align ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-600 dark:text-slate-300'}`}>
+                                                        {align === 'left' && <TextAlignLeftIcon className="w-5 h-5" />}
+                                                        {align === 'center' && <TextAlignCenterIcon className="w-5 h-5" />}
+                                                        {align === 'right' && <TextAlignRightIcon className="w-5 h-5" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                         <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-1 block">Text Outline</label>
+                                            <button onClick={() => setEditingTextOutline(prev => !prev)} className={`w-full p-2 text-xs font-semibold capitalize rounded-md transition-colors ${editingTextOutline ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                                                {editingTextOutline ? 'Outline: On' : 'Outline: Off'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
+                                <div className="flex justify-end pt-2">
+                                     <button onClick={handleEditThumbnail} disabled={isLoading} className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
+                                        {isLoading ? "Generating..." : "Generate Edit"}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex gap-4 mt-6 justify-end">
-                            <button onClick={() => setEditSession(null)} disabled={isLoading} className="px-4 py-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">Close</button>
-                            <button onClick={handleEditThumbnail} disabled={isLoading || !editPrompt.trim()} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">{isLoading ? "Generating..." : "Generate Edit"}</button>
                         </div>
                     </div>
                 </div>

@@ -53,7 +53,7 @@ const WorkflowDiagram = () => {
             <Step 
                 icon={<SparklesIcon className="w-10 h-10" />}
                 title="Craft Creatives"
-                description="Produce social posts, banners, and ad campaigns in seconds."
+                description="Produce social posts, web banners, thumbnails, and full ad campaigns."
                 stepNumber={3}
             />
              <Connector />

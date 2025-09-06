@@ -3,8 +3,8 @@ import PlusIcon from './icons/PlusIcon';
 import WorkflowDiagram from './WorkflowDiagram';
 import PaletteIcon from './icons/PaletteIcon';
 import SparklesIcon from './icons/SparklesIcon';
-import ChatBubbleIcon from './icons/ChatBubbleIcon';
-import BeakerIcon from './icons/BeakerIcon';
+import VideoIcon from './icons/VideoIcon';
+import WandIcon from './icons/WandIcon';
 
 interface HomepageProps {
   onGetStarted: () => void;
@@ -39,7 +39,7 @@ const Homepage: React.FC<HomepageProps> = ({ onGetStarted }) => {
             Build Your Brand in Minutes, <span className="text-indigo-500 dark:text-indigo-400">Not Weeks</span>
             </h1>
             <p className="mt-6 text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            BrandForge AI is your personal branding studio. Generate logos, color palettes, social media assets, and entire campaigns with the power of generative AI.
+            BrandForge AI is your personal branding studio. Generate logos, color palettes, YouTube thumbnails, and entire social media campaigns with the power of generative AI.
             </p>
             <button
             onClick={onGetStarted}
@@ -81,14 +81,14 @@ const Homepage: React.FC<HomepageProps> = ({ onGetStarted }) => {
                     description="Produce stunning marketing materials, from social media posts to web banners, perfectly aligned with your brand identity."
                 />
                 <FeatureCard 
-                    icon={<ChatBubbleIcon className="w-6 h-6" />}
-                    title="Conversational Editing"
-                    description="Refine any generated asset with simple, conversational text prompts. Just ask for the changes you want to see."
+                    icon={<VideoIcon className="w-6 h-6" />}
+                    title="Advanced Thumbnail Studio"
+                    description="Design professional YouTube thumbnails with specialized tools, templates, and fine-tuned controls for maximum engagement."
                 />
                 <FeatureCard 
-                    icon={<BeakerIcon className="w-6 h-6" />}
-                    title="A/B Testing"
-                    description="Instantly create variations of your logos and creatives to test which designs perform best with your audience."
+                    icon={<WandIcon className="w-6 h-6" />}
+                    title="AI-Powered Workflow"
+                    description="Go beyond generation. Conversationally edit any asset, create A/B test variations, and get intelligent suggestions to perfect your creatives."
                 />
             </div>
         </div>
