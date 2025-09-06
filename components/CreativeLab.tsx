@@ -22,7 +22,8 @@ interface CreativeLabProps {
   onUpdateBrand: (brand: Brand) => void;
 }
 
-type LogoPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+type LogoPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'watermark' | 'none';
+type CreativeTab = 'single' | 'campaign';
 
 interface CreativeOption {
     label: string;
@@ -34,7 +35,6 @@ interface CreativeOption {
 const creativeTypeOptions: CreativeOption[] = [
     { label: 'Instagram Post (1:1)', type: 'social_ad', width: 1080, height: 1080 },
     { label: 'Instagram Story (9:16)', type: 'instagram_story', width: 1080, height: 1920 },
-    { label: 'YouTube Thumbnail (16:9)', type: 'youtube_thumbnail', width: 1280, height: 720 },
     { label: 'Web Banner (1.91:1)', type: 'banner', width: 1200, height: 628 },
     { label: 'Twitter Post (16:9)', type: 'twitter_post', width: 1600, height: 900},
 ];
@@ -80,6 +80,7 @@ const templates = [
 ];
 
 const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
+  const [activeCreativeTab, setActiveCreativeTab] = useState<CreativeTab>('single');
   const [prompt, setPrompt] = useState('');
   const [campaignPrompt, setCampaignPrompt] = useState('');
   const [selectedCampaignTypes, setSelectedCampaignTypes] = useState<AssetType[]>(['social_ad']);
@@ -96,8 +97,10 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; }[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestionLoadingMessage, setSuggestionLoadingMessage] = useState('Thinking...');
   const [campaignSuggestions, setCampaignSuggestions] = useState<{ goal: string; prompt: string; }[]>([]);
   const [isCampaignSuggesting, setIsCampaignSuggesting] = useState(false);
+  const [campaignSuggestionLoadingMessage, setCampaignSuggestionLoadingMessage] = useState('Thinking...');
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -221,7 +224,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     e.stopPropagation();
   };
 
-  const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, baseAsset?: BrandAsset) => {
+  const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, logoPos: LogoPosition | null, baseAsset?: BrandAsset) => {
     if (!logoAsset) {
         throw new Error("Please generate a logo in the Identity Studio before creating marketing assets.");
     }
@@ -251,7 +254,18 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     }
 
     const paletteInfo = paletteAsset?.palette ? ` The brand's color palette is named "${paletteAsset.palette.paletteName}" and has a mood of "${paletteAsset.palette.description}". The main colors are ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}. Please use this palette.` : '';
-    const logoPlacementInstruction = logoPosition ? `Place the brand logo in the ${logoPosition.replace('-', ' ')} corner of the image.` : 'Place the brand logo professionally, such as in one of the corners, ensuring it is visible but not obtrusive.';
+    
+    let logoPlacementInstruction = 'Place the brand logo professionally, such as in one of the corners, ensuring it is visible but not obtrusive.';
+    if (logoPos) {
+        if (logoPos === 'none') {
+            logoPlacementInstruction = 'Do not include the brand logo in the image.';
+        } else if (logoPos === 'watermark') {
+            logoPlacementInstruction = 'Place the brand logo as a subtle, semi-transparent watermark across the image.';
+        } else {
+            logoPlacementInstruction = `Place the brand logo in the ${logoPos.replace('-', ' ')} corner of the image.`;
+        }
+    }
+
     const imageIncorporateInstruction = imageToIncorporate && !baseAsset ? 'A key part of this request is to use the user-provided image (the one that is not the logo). This image is a product photo or a key brand asset. It MUST be prominently featured as the central element of the final design. The rest of the creative should be built around it.' : '';
       
     const fullPrompt = `Using the provided brand logo (and other images if available), create a marketing asset. ${imageIncorporateInstruction} ${logoPlacementInstruction} The user's request is: "${generationPrompt}". Ensure the brand logo is clearly visible and the overall style is consistent with the brand.${paletteInfo}`;
@@ -291,7 +305,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     setLoadingMessage("Crafting your creative...");
 
     try {
-        await runGeneration(currentPrompt, currentType, productImage, baseAsset);
+        await runGeneration(currentPrompt, currentType, productImage, logoPosition, baseAsset);
         setPrompt('');
         setProductImage(null);
         if(fileInputRef.current) fileInputRef.current.value = "";
@@ -316,8 +330,9 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
         const asset = campaignAssetsToGenerate[i];
         setLoadingMessage(`Generating Campaign (${i+1}/${campaignAssetsToGenerate.length}): ${asset.label}...`);
         try {
-            const campaignAssetPrompt = `A ${asset.label} for the campaign: "${campaignPrompt}".`;
-            await runGeneration(campaignAssetPrompt, asset.type, campaignImage);
+            const campaignAssetPrompt = `Generate a ${asset.label} for the following campaign: "${campaignPrompt}".`;
+            // For campaign assets, use the default (unspecified) logo position by passing null.
+            await runGeneration(campaignAssetPrompt, asset.type, campaignImage, null);
         } catch(err) {
             setError(err instanceof Error ? `Failed on ${asset.label}: ${err.message}` : `An unknown error occurred during ${asset.label} generation.`);
             break; 
@@ -409,8 +424,19 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
         let imageDescription = '';
 
         if (imageFile) {
+            if (isCampaign) {
+                setCampaignSuggestionLoadingMessage('Analyzing image...');
+            } else {
+                setSuggestionLoadingMessage('Analyzing image...');
+            }
             const base64 = await fileToBase64(imageFile);
             imageDescription = await describeImage(base64, imageFile.type);
+        }
+        
+        if (isCampaign) {
+            setCampaignSuggestionLoadingMessage('Generating ideas...');
+        } else {
+            setSuggestionLoadingMessage('Generating ideas...');
         }
 
         const creativeTypeLabel = isCampaign 
@@ -430,8 +456,10 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     } finally {
         if (isCampaign) {
             setIsCampaignSuggesting(false);
+            setCampaignSuggestionLoadingMessage('Thinking...');
         } else {
             setIsSuggesting(false);
+            setSuggestionLoadingMessage('Thinking...');
         }
     }
   };
@@ -520,182 +548,204 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
             <strong>Action Required:</strong> Please generate a logo in the Identity Studio before creating marketing assets.
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-4">
-                <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-slate-100">Single Creative</h3>
-                
-                <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                    <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {templates.map(template => (
-                            <button key={template.name} onClick={() => handleTemplateClick(template.prompt)} disabled={isLoading} className="text-left p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50">
-                                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{template.name}</span></div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
-                            </button>
-                        ))}
-                    </div>
-                     {(brand.customTemplates || []).length > 0 && (
-                        <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700/50">
-                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-2"><BookmarkIcon className="w-5 h-5"/> Your Custom Templates</h4>
-                             <div className="space-y-2">
-                                {brand.customTemplates?.map(template => (
-                                    <div key={template.id} className="group flex items-center justify-between p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700">
-                                        <button onClick={() => setPrompt(template.prompt)} className="flex-1 text-left">
-                                            <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{template.name}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{template.prompt}</p>
-                                        </button>
-                                        <button onClick={() => handleDeleteCustomTemplate(template.id)} className="ml-2 p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
+        <>
+            <div className="border-b border-slate-200 dark:border-slate-700 mb-8">
+                <nav className="flex space-x-2">
+                    <button
+                        onClick={() => setActiveCreativeTab('single')}
+                        className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeCreativeTab === 'single' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/30'}`}
+                    >
+                        Single Creative
+                    </button>
+                    <button
+                        onClick={() => setActiveCreativeTab('campaign')}
+                        className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeCreativeTab === 'campaign' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/30'}`}
+                    >
+                        Campaign Generator
+                    </button>
+                </nav>
+            </div>
+            
+            <div>
+                {activeCreativeTab === 'single' && (
+                     <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-4 animate-fade-in">
+                        <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-slate-100">Single Creative</h3>
+                        
+                        <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {templates.map(template => (
+                                    <button key={template.name} onClick={() => handleTemplateClick(template.prompt)} disabled={isLoading} className="text-left p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50">
+                                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{template.name}</span></div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
+                                    </button>
+                                ))}
+                            </div>
+                            {(brand.customTemplates || []).length > 0 && (
+                                <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700/50">
+                                    <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-2"><BookmarkIcon className="w-5 h-5"/> Your Custom Templates</h4>
+                                    <div className="space-y-2">
+                                        {brand.customTemplates?.map(template => (
+                                            <div key={template.id} className="group flex items-center justify-between p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700">
+                                                <button onClick={() => setPrompt(template.prompt)} className="flex-1 text-left">
+                                                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{template.name}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{template.prompt}</p>
+                                                </button>
+                                                <button onClick={() => handleDeleteCustomTemplate(template.id)} className="ml-2 p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Or write your own prompt</label>
+                            <button 
+                                onClick={() => handleSuggestPrompts('single')} 
+                                disabled={isSuggesting || isLoading}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50 disabled:cursor-wait"
+                            >
+                                <LightbulbIcon className="w-4 h-4" />
+                                {isSuggesting ? suggestionLoadingMessage : 'Get Suggestions'}
+                            </button>
+                        </div>
+                        <div className="relative">
+                            <textarea
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                placeholder="e.g., An Instagram post for a new coffee blend called 'Morning Rush'."
+                                className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
+                                rows={3}
+                                disabled={isLoading}
+                            />
+                            <button 
+                                onClick={() => setShowSaveTemplateModal(true)} 
+                                disabled={!prompt.trim() || isLoading}
+                                title="Save as Template"
+                                className="absolute top-2 right-2 p-1.5 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50"
+                            >
+                                <BookmarkIcon className="w-5 h-5"/>
+                            </button>
+                        </div>
+                        </div>
+                        {suggestions.length > 0 && !isSuggesting && (
+                            <div className="space-y-2 animate-fade-in">
+                                <h5 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Suggestions</h5>
+                                {suggestions.map((s, i) => (
+                                    <button 
+                                        key={i} 
+                                        onClick={() => setPrompt(s.prompt)}
+                                        className="w-full text-left p-2.5 bg-slate-100 dark:bg-slate-700/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition-colors"
+                                    >
+                                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{s.goal}</p>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400">{s.prompt}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Creative Type</label>
+                                <select value={creativeType} onChange={e => setCreativeType(e.target.value as AssetType)} disabled={isLoading} className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100">
+                                    {creativeTypeOptions.map(opt => <option key={opt.type} value={opt.type}>{opt.label}</option>)}
+                                </select>
+                            </div>
+                            {renderImageUpload("Upload Image (Optional)", productImage, setProductImage, fileInputRef)}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo Position (Optional)</label>
+                            <div className="flex flex-wrap gap-2">
+                                {(['top-right', 'top-left', 'bottom-right', 'bottom-left', 'watermark', 'none'] as LogoPosition[]).map(pos => (
+                                    <button key={pos} onClick={() => setLogoPosition(logoPosition === pos ? null : pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
+                                        {pos.replace('-', ' ')}
+                                    </button>
                                 ))}
                             </div>
                         </div>
-                    )}
-                </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Or write your own prompt</label>
-                    <button 
-                        onClick={() => handleSuggestPrompts('single')} 
-                        disabled={isSuggesting || isLoading}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50 disabled:cursor-wait"
-                    >
-                        <LightbulbIcon className="w-4 h-4" />
-                        {isSuggesting ? 'Thinking...' : 'Get Suggestions'}
-                    </button>
-                  </div>
-                   <div className="relative">
-                     <textarea
-                         value={prompt}
-                         onChange={(e) => setPrompt(e.target.value)}
-                         placeholder="e.g., An Instagram post for a new coffee blend called 'Morning Rush'."
-                         className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
-                         rows={3}
-                         disabled={isLoading}
-                     />
-                      <button 
-                        onClick={() => setShowSaveTemplateModal(true)} 
-                        disabled={!prompt.trim() || isLoading}
-                        title="Save as Template"
-                        className="absolute top-2 right-2 p-1.5 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50"
-                    >
-                        <BookmarkIcon className="w-5 h-5"/>
-                    </button>
-                   </div>
-                </div>
-                {suggestions.length > 0 && !isSuggesting && (
-                    <div className="space-y-2 animate-fade-in">
-                        <h5 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Suggestions</h5>
-                        {suggestions.map((s, i) => (
-                            <button 
-                                key={i} 
-                                onClick={() => setPrompt(s.prompt)}
-                                className="w-full text-left p-2.5 bg-slate-100 dark:bg-slate-700/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition-colors"
-                            >
-                                <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{s.goal}</p>
-                                <p className="text-xs text-slate-600 dark:text-slate-400">{s.prompt}</p>
-                            </button>
-                        ))}
+                        <button
+                            onClick={() => handleGenerate()}
+                            disabled={isLoading || !prompt.trim()}
+                            className="!mt-6 flex-shrink-0 flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
+                        >
+                            <SparklesIcon className="w-5 h-5" />
+                            {isLoading && loadingMessage.startsWith("Crafting") ? 'Generating...' : 'Generate Creative'}
+                        </button>
                     </div>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Creative Type</label>
-                        <select value={creativeType} onChange={e => setCreativeType(e.target.value as AssetType)} disabled={isLoading} className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100">
-                            {creativeTypeOptions.map(opt => <option key={opt.type} value={opt.type}>{opt.label}</option>)}
-                        </select>
-                    </div>
-                     {renderImageUpload("Upload Image (Optional)", productImage, setProductImage, fileInputRef)}
-                </div>
-
-                <div>
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo Position (Optional)</label>
-                    <div className="flex flex-wrap gap-2">
-                        {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as LogoPosition[]).map(pos => (
-                            <button key={pos} onClick={() => setLogoPosition(logoPosition === pos ? null : pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
-                                {pos.replace('-', ' ')}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <button
-                    onClick={() => handleGenerate()}
-                    disabled={isLoading || !prompt.trim()}
-                    className="!mt-6 flex-shrink-0 flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
-                >
-                    <SparklesIcon className="w-5 h-5" />
-                    {isLoading && loadingMessage.startsWith("Crafting") ? 'Generating...' : 'Generate Creative'}
-                </button>
-            </div>
-
-            <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-4">
-                <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">One-Click Campaign</h3>
-                
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Campaign Theme / Tagline</label>
-                    <button 
-                        onClick={() => handleSuggestPrompts('campaign')} 
-                        disabled={isCampaignSuggesting || isLoading}
-                        className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-500 disabled:opacity-50 disabled:cursor-wait"
-                    >
-                        <LightbulbIcon className="w-4 h-4" />
-                        {isCampaignSuggesting ? 'Thinking...' : 'Get Suggestions'}
-                    </button>
-                  </div>
-                  <input
-                      type="text"
-                      value={campaignPrompt}
-                      onChange={(e) => setCampaignPrompt(e.target.value)}
-                      placeholder="e.g., 'Summer Sale: 50% Off Everything!'"
-                      className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
-                      disabled={isLoading}
-                  />
-                </div>
-                {campaignSuggestions.length > 0 && !isCampaignSuggesting && (
-                    <div className="space-y-2 animate-fade-in">
-                        <h5 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Suggestions</h5>
-                        {campaignSuggestions.map((s, i) => (
+                {activeCreativeTab === 'campaign' && (
+                     <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-4 animate-fade-in">
+                        <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">One-Click Campaign</h3>
+                        
+                        <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Campaign Theme / Tagline</label>
                             <button 
-                                key={i} 
-                                onClick={() => setCampaignPrompt(s.prompt)}
-                                className="w-full text-left p-2.5 bg-slate-100 dark:bg-slate-700/50 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-md transition-colors"
+                                onClick={() => handleSuggestPrompts('campaign')} 
+                                disabled={isCampaignSuggesting || isLoading}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-500 disabled:opacity-50 disabled:cursor-wait"
                             >
-                                <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{s.goal}</p>
-                                <p className="text-xs text-slate-600 dark:text-slate-400">{s.prompt}</p>
+                                <LightbulbIcon className="w-4 h-4" />
+                                {isCampaignSuggesting ? campaignSuggestionLoadingMessage : 'Get Suggestions'}
                             </button>
-                        ))}
+                        </div>
+                        <input
+                            type="text"
+                            value={campaignPrompt}
+                            onChange={(e) => setCampaignPrompt(e.target.value)}
+                            placeholder="e.g., 'Summer Sale: 50% Off Everything!'"
+                            className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
+                            disabled={isLoading}
+                        />
+                        </div>
+                        {campaignSuggestions.length > 0 && !isCampaignSuggesting && (
+                            <div className="space-y-2 animate-fade-in">
+                                <h5 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Suggestions</h5>
+                                {campaignSuggestions.map((s, i) => (
+                                    <button 
+                                        key={i} 
+                                        onClick={() => setCampaignPrompt(s.prompt)}
+                                        className="w-full text-left p-2.5 bg-slate-100 dark:bg-slate-700/50 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-md transition-colors"
+                                    >
+                                        <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{s.goal}</p>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400">{s.prompt}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {renderImageUpload("Campaign Image (Optional)", campaignImage, setCampaignImage, campaignFileInputRef)}
+
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Select Creatives to Generate</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                {campaignAssets.map(asset => (
+                                    <label key={asset.type} className={`flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer ${selectedCampaignTypes.includes(asset.type) ? 'bg-purple-100 dark:bg-purple-900/50 border-purple-400 dark:border-purple-600' : 'bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'} border`}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedCampaignTypes.includes(asset.type)}
+                                            onChange={() => handleCampaignTypeToggle(asset.type)}
+                                            className="h-4 w-4 rounded bg-slate-300 dark:bg-slate-600 border-slate-400 dark:border-slate-500 text-purple-600 focus:ring-purple-500"
+                                            disabled={isLoading}
+                                        />
+                                        <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{asset.label.split('(')[0]}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <button onClick={handleGenerateCampaign} disabled={isLoading || !campaignPrompt.trim() || selectedCampaignTypes.length === 0} className="!mt-6 flex items-center gap-2 px-6 py-2.5 font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors disabled:bg-purple-600/50 dark:disabled:bg-purple-900/50 disabled:cursor-not-allowed shadow-md">
+                            <SparklesIcon className="w-5 h-5"/>
+                            {isLoading && loadingMessage.startsWith("Generating Campaign") ? 'Generating...' : 'Generate Campaign Pack'}
+                        </button>
                     </div>
                 )}
-                {renderImageUpload("Campaign Image (Optional)", campaignImage, setCampaignImage, campaignFileInputRef)}
-
-                <div>
-                     <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Select Creatives to Generate</label>
-                     <div className="grid grid-cols-2 gap-3">
-                        {campaignAssets.map(asset => (
-                            <label key={asset.type} className={`flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer ${selectedCampaignTypes.includes(asset.type) ? 'bg-purple-100 dark:bg-purple-900/50 border-purple-400 dark:border-purple-600' : 'bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'} border`}>
-                                <input
-                                    type="checkbox"
-                                    checked={selectedCampaignTypes.includes(asset.type)}
-                                    onChange={() => handleCampaignTypeToggle(asset.type)}
-                                    className="h-4 w-4 rounded bg-slate-300 dark:bg-slate-600 border-slate-400 dark:border-slate-500 text-purple-600 focus:ring-purple-500"
-                                    disabled={isLoading}
-                                />
-                                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{asset.label.split('(')[0]}</span>
-                            </label>
-                        ))}
-                     </div>
-                </div>
-
-                <button onClick={handleGenerateCampaign} disabled={isLoading || !campaignPrompt.trim() || selectedCampaignTypes.length === 0} className="!mt-6 flex items-center gap-2 px-6 py-2.5 font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors disabled:bg-purple-600/50 dark:disabled:bg-purple-900/50 disabled:cursor-not-allowed shadow-md">
-                    <SparklesIcon className="w-5 h-5"/>
-                    {isLoading && loadingMessage.startsWith("Generating Campaign") ? 'Generating...' : 'Generate Campaign Pack'}
-                </button>
             </div>
-        </div>
+        </>
       )}
 
       {isLoading && <div className="mt-8 flex justify-center"><Loader message={loadingMessage}/></div>}

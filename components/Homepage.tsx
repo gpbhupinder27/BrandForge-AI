@@ -52,7 +52,7 @@ const Homepage: React.FC<HomepageProps> = ({ onGetStarted }) => {
       </section>
       
       {/* How It Works Section */}
-      <section className="py-24">
+      <section className="py-16">
         <div className="max-w-6xl mx-auto px-4">
             <div className="text-center mb-16">
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100">A Simple, Powerful Workflow</h2>

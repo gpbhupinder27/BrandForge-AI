@@ -180,3 +180,34 @@ export const generatePromptSuggestions = async (
         return [];
     }
 };
+
+export const generateThumbnailElementSuggestions = async (
+    style: string,
+    emotion: string,
+    overlayText: string,
+    baseImagePrompt: string,
+    imageDescription: string
+): Promise<string[]> => {
+    const prompt = `
+        You are an expert YouTube thumbnail designer. A user is creating a thumbnail with the following attributes:
+        - Style: "${style}"
+        - Human Emotion to Convey: "${emotion}"
+        - Overlay Text: "${overlayText || 'Not specified'}"
+        - Base Image Concept: "${baseImagePrompt || imageDescription || 'Not specified'}"
+
+        Based on this context, suggest 3-5 simple, high-impact graphical elements to add to the *base image prompt* to make the thumbnail more engaging and clickable. The suggestions should complement the specified style and emotion. For example, for 'Vibrant & Energetic' and 'Excited', you might suggest 'exploding stars' or 'dynamic speed lines'. For 'Dark & Moody' and 'Serious', you might suggest 'a subtle lens flare' or 'a gritty texture overlay'.
+
+        Return the suggestions as a JSON array of short, descriptive strings.
+    `;
+    try {
+        const schema = {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+        };
+        const result = await generateStructuredContent<string[]>(prompt, schema);
+        return result || [];
+    } catch (error) {
+        console.error("Error generating thumbnail element suggestions:", error);
+        return [];
+    }
+};

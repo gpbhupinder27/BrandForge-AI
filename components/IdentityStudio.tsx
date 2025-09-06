@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+
+
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Brand, BrandAsset, ColorPalette, TypographyPairing } from '../types';
-import { generateWithNanoBanana, fileToBase64, generateStructuredContent } from '../services/geminiService';
+import { generateWithNanoBanana, fileToBase64, generateStructuredContent, describeImage, generatePromptSuggestions } from '../services/geminiService';
 import { storeImage, getImage } from '../services/imageDb';
 import { Type } from "@google/genai";
 import Loader from './Loader';
@@ -16,6 +18,8 @@ import ImageIcon from './icons/ImageIcon';
 import BeakerIcon from './icons/BeakerIcon';
 import TemplateIcon from './icons/TemplateIcon';
 import RectangleStackIcon from './icons/RectangleStackIcon';
+import XMarkIcon from './icons/XMarkIcon';
+import LightbulbIcon from './icons/LightbulbIcon';
 
 interface IdentityStudioProps {
   brand: Brand;
@@ -38,17 +42,48 @@ const logoTemplates = [
     {
         name: 'Playful Mascot',
         description: 'Friendly, fun, and approachable character.',
-        prompt: "A fun and friendly mascot logo for '[Brand Name]'. Create a simple, cute character that represents the brand's personality, which is described as '[Brand Description]'. The mascot should be approachable and memorable.",
+        prompt: "A fun and friendly mascot logo for '[Brand Name]'. Create a simple, cute character that represents the brand's friendly and approachable personality. The mascot should be memorable.",
         icon: <SparklesIcon className="w-6 h-6" />
     },
     {
         name: 'Abstract Mark',
         description: 'Dynamic, unique, and conceptual.',
-        prompt: "An abstract, dynamic logo mark for '[Brand Name]'. The design should represent the idea of '[Brand Description]' using flowing lines, unique shapes, or an interesting visual concept. It should be modern and versatile.",
+        prompt: "An abstract, dynamic logo mark for '[Brand Name]'. The design should represent the brand's core ideas using flowing lines, unique shapes, or an interesting visual concept. It should be modern and versatile.",
         icon: <BeakerIcon className="w-6 h-6" />
     }
 ];
 
+const popularGoogleFonts = [
+    'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald', 'Playfair Display',
+    'Merriweather', 'Lora', 'Source Sans Pro', 'Poppins', 'Nunito', 'Raleway',
+    'Inter', 'Work Sans', 'Ubuntu', 'PT Serif', 'Noto Sans', 'Arvo', 'Fira Sans',
+    'Inconsolata', 'Lobster', 'Pacifico', 'Bebas Neue', 'Exo 2', 'Comfortaa',
+    'Josefin Sans', 'Abel', 'Barlow', 'Cabin', 'Dosis', 'Quicksand'
+];
+
+interface SectionProps {
+  title: string;
+  icon: React.ReactNode;
+  subtitle: string;
+  children: React.ReactNode;
+  step?: number;
+  disabled?: boolean;
+}
+
+const Section: React.FC<SectionProps> = ({ title, icon, subtitle, children, step, disabled = false }) => (
+    <section className={`bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+        <h3 className="text-2xl font-bold mb-2 flex items-center gap-3 text-slate-900 dark:text-slate-100">
+            {step && <span className="flex items-center justify-center w-8 h-8 text-sm font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-300 dark:border-indigo-500 rounded-full">{step}</span>}
+            {icon}
+            {title}
+        </h3>
+        <p className={`text-slate-500 dark:text-slate-400 mb-6 ${step ? 'ml-11' : ''}`}>{subtitle}</p>
+        <div className={step ? 'ml-11' : ''}>
+            {children}
+            {disabled && <p className="text-xs text-yellow-500 dark:text-yellow-400 mt-2">Complete the previous step first.</p>}
+        </div>
+    </section>
+);
 
 const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand }) => {
   const [palettePrompt, setPalettePrompt] = useState('');
@@ -61,13 +96,58 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
   const [previewingAsset, setPreviewingAsset] = useState<BrandAsset | null>(null);
   const [editPrompt, setEditPrompt] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
-
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; }[]>([]);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestionLoadingMessage, setSuggestionLoadingMessage] = useState('Thinking...');
+  
   const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
   const typographyAsset = brand.assets.find(asset => asset.type === 'typography');
   const logoAssets = brand.assets.filter(asset => asset.type === 'logo').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
+  const [manualHeadlineFont, setManualHeadlineFont] = useState(typographyAsset?.typography?.headlineFont.name || '');
+  const [manualBodyFont, setManualBodyFont] = useState(typographyAsset?.typography?.bodyFont.name || '');
+
   const allLogoTags = [...new Set(logoAssets.filter(a => !a.parentId).flatMap(a => a.tags || []))].sort();
 
+  useEffect(() => {
+    setSuggestions([]);
+  }, [referenceImage]);
+
+  useEffect(() => {
+    if (typographyAsset?.typography) {
+        setManualHeadlineFont(typographyAsset.typography.headlineFont.name);
+        setManualBodyFont(typographyAsset.typography.bodyFont.name);
+
+        const headlineFontName = typographyAsset.typography.headlineFont.name;
+        const bodyFontName = typographyAsset.typography.bodyFont.name;
+
+        if (headlineFontName && bodyFontName) {
+            const fontFamilies = [headlineFontName, bodyFontName]
+                .filter((v, i, a) => a.indexOf(v) === i) // Unique fonts
+                .map(font => `${font.replace(/ /g, '+')}`)
+                .join('&family=');
+            
+            const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamilies}&display=swap`;
+
+            // Check if the link already exists
+            const existingLink = document.head.querySelector(`link[href="${fontUrl}"]`);
+            if (!existingLink) {
+                 // Remove old dynamic font links to prevent clutter
+                const oldLinks = document.head.querySelectorAll('link[data-dynamic-font]');
+                oldLinks.forEach(link => link.remove());
+                
+                const link = document.createElement('link');
+                link.href = fontUrl;
+                link.rel = 'stylesheet';
+                link.setAttribute('data-dynamic-font', 'true'); // Mark as dynamic
+                document.head.appendChild(link);
+            }
+        }
+    }
+  }, [typographyAsset]);
+  
   const assetGroups = useMemo(() => {
     const originals = logoAssets.filter(a => !a.parentId);
     const variantsMap = logoAssets.reduce((map, asset) => {
@@ -101,9 +181,33 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
     let finalPrompt = templatePrompt;
     // Replace placeholders with brand-specific details
     finalPrompt = finalPrompt.replace(/\[Brand Name\]/gi, brand.name);
-    finalPrompt = finalPrompt.replace(/\[Brand Description\]/gi, brand.description);
-
     setLogoPrompt(finalPrompt);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setReferenceImage(e.target.files[0]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.remove('border-indigo-500', 'dark:border-indigo-400');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        setReferenceImage(file);
+        if (fileInputRef.current) {
+          fileInputRef.current.files = e.dataTransfer.files;
+        }
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleUpdateAssetTags = (assetId: string, tags: string[]) => {
@@ -177,6 +281,26 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
     }
   };
 
+  const handleSetManualFonts = () => {
+    if (!manualHeadlineFont.trim() || !manualBodyFont.trim()) return;
+    
+    const newTypography: TypographyPairing = {
+        headlineFont: { name: manualHeadlineFont, description: 'Manually selected font.' },
+        bodyFont: { name: manualBodyFont, description: 'Manually selected font.' }
+    };
+    
+    const newAsset: BrandAsset = {
+        id: crypto.randomUUID(),
+        type: 'typography',
+        prompt: 'Manually selected fonts.',
+        typography: newTypography,
+        createdAt: new Date().toISOString()
+    };
+    
+    const updatedAssets = brand.assets.filter(a => a.type !== 'typography').concat(newAsset);
+    onUpdateBrand({ ...brand, assets: updatedAssets });
+  };
+
   const handleGenerateLogo = async (baseAsset?: BrandAsset) => {
     const currentPrompt = baseAsset ? editPrompt : logoPrompt;
     if (!currentPrompt.trim()) return;
@@ -195,11 +319,15 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
           const file = new File([blob], "edit_image.png", { type: blob.type });
           const base64 = await fileToBase64(file);
           imageInputs.push({ data: base64, mimeType: file.type });
+      } else if (referenceImage) {
+          const base64 = await fileToBase64(referenceImage);
+          imageInputs.push({ data: base64, mimeType: referenceImage.type });
       }
       
       const paletteInfo = paletteAsset?.palette ? ` Use a color palette inspired by these hex codes: ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}.` : '';
       const typoInfo = typographyAsset?.typography ? ` The brand's typography feels like: "${typographyAsset.typography.headlineFont.description}".` : '';
-      const finalPrompt = `Create a logo for a brand named "${brand.name}". The user's request is: "${currentPrompt}".${paletteInfo}${typoInfo}`;
+      const referenceInfo = !baseAsset && referenceImage ? ` The user has provided a reference image; use it as strong visual inspiration for the logo's style, shape, and overall concept.` : '';
+      const finalPrompt = `Create a logo for a brand named "${brand.name}". The user's request is: "${currentPrompt}".${paletteInfo}${typoInfo}${referenceInfo}`;
 
       const generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, 1024, 1024);
       
@@ -224,6 +352,8 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
       setPreviewingAsset(null);
       setEditPrompt('');
       setLogoPrompt('');
+      setReferenceImage(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
@@ -283,82 +413,124 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
         setLoadingSection(null);
     }
   };
+
+  const handleSuggestPrompts = async () => {
+    setIsSuggesting(true);
+    setSuggestions([]);
+    setError(null);
+
+    try {
+        let imageDescription = '';
+        if (referenceImage) {
+            setSuggestionLoadingMessage('Analyzing image...');
+            const base64 = await fileToBase64(referenceImage);
+            imageDescription = await describeImage(base64, referenceImage.type);
+        }
+        
+        setSuggestionLoadingMessage('Generating ideas...');
+        const creativeTypeLabel = "Brand Logo";
+        const generatedSuggestions = await generatePromptSuggestions(creativeTypeLabel, brand.description, imageDescription);
+        setSuggestions(generatedSuggestions);
+
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred while generating suggestions.');
+    } finally {
+        setIsSuggesting(false);
+        setSuggestionLoadingMessage('Thinking...');
+    }
+  };
   
-  const Section = ({ title, icon, subtitle, children, step, disabled = false }: { title: string, icon: React.ReactNode, subtitle: string, children: React.ReactNode, step: number, disabled?: boolean }) => (
-    <section className={`bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-        <h3 className="text-2xl font-bold mb-2 flex items-center gap-3 text-slate-900 dark:text-slate-100">
-            <span className="flex items-center justify-center w-8 h-8 text-sm font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-300 dark:border-indigo-500 rounded-full">{step}</span>
-            {icon}
-            {title}
-        </h3>
-        <p className="text-slate-500 dark:text-slate-400 mb-6 ml-11">{subtitle}</p>
-        <div className="ml-11">
-            {children}
-            {disabled && <p className="text-xs text-yellow-500 dark:text-yellow-400 mt-2">Complete the previous step first.</p>}
-        </div>
-    </section>
-  );
 
   return (
     <div className="space-y-8">
-      {/* Step 1: Color Palette */}
-      <Section title="Color Palette" icon={<PaletteIcon className="w-6 h-6"/>} subtitle="Define your brand's look and feel with a unique color scheme." step={1}>
-        {loadingSection === 'palette' ? <Loader message="Creating palette..."/> : paletteAsset?.palette ? (
-            <div>
-                <h5 className="font-bold text-lg text-slate-900 dark:text-slate-100">{paletteAsset.palette.paletteName}</h5>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{paletteAsset.palette.description}</p>
-                <div className="flex flex-wrap gap-4">
-                    {paletteAsset.palette.colors.map(color => (
-                        <div key={color.hex} className="text-center">
-                            <div className="w-20 h-20 rounded-full border-2 border-slate-200 dark:border-slate-600 shadow-md" style={{ backgroundColor: color.hex }}></div>
-                            <p className="text-sm mt-2 font-mono tracking-tighter text-slate-700 dark:text-slate-300">{color.hex}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{color.name}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        ) : <p className="text-slate-500 italic">No color palette generated yet.</p>}
-        <div className="mt-6 flex flex-wrap gap-4 items-center">
-          <input type="text" value={palettePrompt} onChange={e => setPalettePrompt(e.target.value)} placeholder="Describe a color palette (e.g., earthy tones)" className="flex-grow bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100" disabled={isLoading} />
-          <div className="flex gap-2">
-            <button onClick={() => handleGeneratePalette(true)} disabled={isLoading || !palettePrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
-                <SparklesIcon className="w-5 h-5"/> Generate
-            </button>
-            <button onClick={() => handleGeneratePalette(false)} disabled={isLoading} title="Regenerate Palette" className="p-2.5 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed">
-                <RegenerateIcon className="w-5 h-5"/>
-            </button>
-          </div>
-        </div>
-      </Section>
-
-      {/* Step 2: Typography */}
-      <Section title="Typography Pairing" icon={<TypographyIcon className="w-6 h-6"/>} subtitle="Choose the fonts that will give your brand a voice." step={2} disabled={!paletteAsset}>
-          {loadingSection === 'typography' ? <Loader message="Designing fonts..."/> : typographyAsset?.typography ? (
-              <div className="space-y-6 bg-slate-100 dark:bg-slate-700/30 p-4 rounded-md">
-                  <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Headline</p>
-                      <p className="text-4xl font-bold text-slate-900 dark:text-slate-50" style={{fontFamily: typographyAsset.typography.headlineFont.name}}>{typographyAsset.typography.headlineFont.name}</p>
-                      <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.headlineFont.description}</p>
-                  </div>
-                   <div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Body</p>
-                      <p className="text-lg text-slate-800 dark:text-slate-200" style={{fontFamily: typographyAsset.typography.bodyFont.name}}>The quick brown fox jumps over the lazy dog. {typographyAsset.typography.bodyFont.name}</p>
-                      <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.bodyFont.description}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Step 1: Color Palette */}
+        <Section title="Color Palette" icon={<PaletteIcon className="w-6 h-6"/>} subtitle="Define your brand's look and feel." step={1}>
+          {loadingSection === 'palette' ? <Loader message="Creating palette..."/> : paletteAsset?.palette ? (
+              <div>
+                  <h5 className="font-bold text-lg text-slate-900 dark:text-slate-100">{paletteAsset.palette.paletteName}</h5>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{paletteAsset.palette.description}</p>
+                  <div className="flex flex-wrap gap-4">
+                      {paletteAsset.palette.colors.map(color => (
+                          <div key={color.hex} className="text-center">
+                              <div className="w-20 h-20 rounded-full border-2 border-slate-200 dark:border-slate-600 shadow-md" style={{ backgroundColor: color.hex }}></div>
+                              <p className="text-sm mt-2 font-mono tracking-tighter text-slate-700 dark:text-slate-300">{color.hex}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{color.name}</p>
+                          </div>
+                      ))}
                   </div>
               </div>
-          ) : <p className="text-slate-500 italic">No typography pairing generated yet.</p>}
+          ) : <p className="text-slate-500 italic">No color palette generated yet.</p>}
           <div className="mt-6 flex flex-wrap gap-4 items-center">
-            <input type="text" value={typographyPrompt} onChange={e => setTypographyPrompt(e.target.value)} placeholder="Describe a font style (e.g., elegant and classic)" className="flex-grow bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100" disabled={isLoading} />
+            <input type="text" value={palettePrompt} onChange={e => setPalettePrompt(e.target.value)} placeholder="e.g., earthy tones" className="flex-grow bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100" disabled={isLoading} />
             <div className="flex gap-2">
-              <button onClick={() => handleGenerateTypography(true)} disabled={isLoading || !typographyPrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
+              <button onClick={() => handleGeneratePalette(true)} disabled={isLoading || !palettePrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
                   <SparklesIcon className="w-5 h-5"/> Generate
               </button>
-              <button onClick={() => handleGenerateTypography(false)} disabled={isLoading} title="Regenerate Typography" className="p-2.5 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed">
+              <button onClick={() => handleGeneratePalette(false)} disabled={isLoading} title="Regenerate Palette" className="p-2.5 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed">
                   <RegenerateIcon className="w-5 h-5"/>
               </button>
             </div>
-        </div>
-      </Section>
+          </div>
+        </Section>
+
+        {/* Step 2: Typography */}
+        <Section title="Typography Pairing" icon={<TypographyIcon className="w-6 h-6"/>} subtitle="Choose the fonts for your brand." step={2} disabled={!paletteAsset}>
+            {loadingSection === 'typography' ? <Loader message="Designing fonts..."/> : typographyAsset?.typography ? (
+                <div className="space-y-6 bg-slate-100 dark:bg-slate-700/30 p-4 rounded-md">
+                    <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Headline</p>
+                        <p className="text-4xl font-bold text-slate-900 dark:text-slate-50" style={{fontFamily: typographyAsset.typography.headlineFont.name}}>{typographyAsset.typography.headlineFont.name}</p>
+                        <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.headlineFont.description}</p>
+                    </div>
+                     <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Body</p>
+                        <p className="text-lg text-slate-800 dark:text-slate-200" style={{fontFamily: typographyAsset.typography.bodyFont.name}}>The quick brown fox jumps over the lazy dog. {typographyAsset.typography.bodyFont.name}</p>
+                        <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.bodyFont.description}</p>
+                    </div>
+                </div>
+            ) : <p className="text-slate-500 italic">No typography pairing generated yet.</p>}
+            <div className="mt-6 space-y-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-3">AI Generation</h4>
+                  <div className="flex flex-wrap gap-4 items-center">
+                      <input type="text" value={typographyPrompt} onChange={e => setTypographyPrompt(e.target.value)} placeholder="e.g., elegant and classic" className="flex-grow bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100" disabled={isLoading} />
+                      <div className="flex gap-2">
+                      <button onClick={() => handleGenerateTypography(true)} disabled={isLoading || !typographyPrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
+                          <SparklesIcon className="w-5 h-5"/> Generate
+                      </button>
+                      <button onClick={() => handleGenerateTypography(false)} disabled={isLoading} title="Regenerate Typography" className="p-2.5 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed">
+                          <RegenerateIcon className="w-5 h-5"/>
+                      </button>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-3">Manual Selection</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Headline Font</label>
+                          <select value={manualHeadlineFont} onChange={e => setManualHeadlineFont(e.target.value)} className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100" disabled={isLoading}>
+                              <option value="">Select a font</option>
+                              {popularGoogleFonts.map(font => <option key={font} value={font}>{font}</option>)}
+                          </select>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Body Font</label>
+                          <select value={manualBodyFont} onChange={e => setManualBodyFont(e.target.value)} className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100" disabled={isLoading}>
+                              <option value="">Select a font</option>
+                              {popularGoogleFonts.map(font => <option key={font} value={font}>{font}</option>)}
+                          </select>
+                      </div>
+                  </div>
+                  <button onClick={handleSetManualFonts} disabled={isLoading || !manualHeadlineFont.trim() || !manualBodyFont.trim()} className="mt-4 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
+                      Set Manual Fonts
+                  </button>
+              </div>
+            </div>
+        </Section>
+      </div>
 
       {/* Step 3: Logo Generation */}
       <Section title="Logo Generation" icon={<SparklesIcon className="w-6 h-6"/>} subtitle="Bring your brand to life with a unique logo." step={3} disabled={!typographyAsset}>
@@ -379,7 +551,17 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
               </div>
           </div>
           
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Or write your own prompt</p>
+            <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Or write your own prompt</label>
+                <button 
+                    onClick={handleSuggestPrompts} 
+                    disabled={isSuggesting || isLoading}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50 disabled:cursor-wait"
+                >
+                    <LightbulbIcon className="w-4 h-4" />
+                    {isSuggesting ? suggestionLoadingMessage : 'Get Suggestions'}
+                </button>
+            </div>
           <textarea
             value={logoPrompt}
             onChange={(e) => setLogoPrompt(e.target.value)}
@@ -388,6 +570,65 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
             rows={3}
             disabled={isLoading}
           />
+        
+          {suggestions.length > 0 && !isSuggesting && (
+                <div className="mt-4 space-y-2 animate-fade-in">
+                    <h5 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Suggestions</h5>
+                    {suggestions.map((s, i) => (
+                        <button 
+                            key={i} 
+                            onClick={() => setLogoPrompt(s.prompt)}
+                            className="w-full text-left p-2.5 bg-slate-100 dark:bg-slate-700/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition-colors"
+                        >
+                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{s.goal}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">{s.prompt}</p>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+          <div className="mt-4">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Reference Image (Optional)</label>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Upload a sketch, an existing logo, or an inspirational image to guide the AI.</p>
+              {referenceImage ? (
+                  <div className="relative group">
+                      <img src={URL.createObjectURL(referenceImage)} alt="Reference Preview" className="w-full h-auto max-h-48 object-contain rounded-md border border-slate-300 dark:border-slate-600 p-1 bg-slate-100 dark:bg-slate-700/50" />
+                      <button
+                          onClick={() => {
+                              setReferenceImage(null);
+                              if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                          className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
+                          aria-label="Remove image"
+                      >
+                          <XMarkIcon className="w-4 h-4" />
+                      </button>
+                  </div>
+              ) : (
+                  <div
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={(e) => e.currentTarget.classList.remove('border-indigo-500', 'dark:border-indigo-400')}
+                      onDragEnter={(e) => e.currentTarget.classList.add('border-indigo-500', 'dark:border-indigo-400')}
+                      className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                  >
+                      <ImageIcon className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
+                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                          <span className="font-semibold text-indigo-600 dark:text-indigo-400">Click to upload</span> or drag and drop
+                      </p>
+                      <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          ref={fileInputRef}
+                          className="hidden"
+                          disabled={isLoading}
+                      />
+                  </div>
+              )}
+          </div>
+          
           <button
             onClick={() => handleGenerateLogo()}
             disabled={isLoading || !logoPrompt.trim()}

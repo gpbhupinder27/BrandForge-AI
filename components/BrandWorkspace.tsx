@@ -8,9 +8,13 @@ import { generateStructuredContent, generateWithNanoBanana } from '../services/g
 import { storeImage, getImage } from '../services/imageDb';
 import { Type } from "@google/genai";
 import AsyncImage from './AsyncImage';
-import ExportIcon from './icons/ExportIcon';
 import AssetLibrary from './AssetLibrary';
 import AssetDetailView from './AssetDetailView';
+import ThumbnailStudio from './ThumbnailStudio';
+import VideoIcon from './icons/VideoIcon';
+import IdentificationIcon from './icons/IdentificationIcon';
+import SparklesIcon from './icons/SparklesIcon';
+import RectangleStackIcon from './icons/RectangleStackIcon';
 
 // This will be populated by the script tag in index.html
 declare const JSZip: any;
@@ -21,7 +25,7 @@ interface BrandWorkspaceProps {
   onUpdateBrand: (updatedBrand: Brand) => void;
 }
 
-type WorkspaceTab = 'identity' | 'creatives' | 'library';
+type WorkspaceTab = 'identity' | 'creatives' | 'thumbnails' | 'library';
 
 const dataURLtoBlob = (dataurl: string) => {
     const arr = dataurl.split(',');
@@ -171,6 +175,8 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
             return <IdentityStudio brand={brand} onUpdateBrand={onUpdateBrand} />;
         case 'creatives':
             return <CreativeLab brand={brand} onUpdateBrand={onUpdateBrand} />;
+        case 'thumbnails':
+            return <ThumbnailStudio brand={brand} onUpdateBrand={onUpdateBrand} />;
         case 'library':
             return <AssetLibrary 
                         brand={brand} 
@@ -202,23 +208,33 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
                     </div>
                 </div>
                  <div className="border-b border-slate-200 dark:border-slate-700 mb-8">
-                    <nav className="flex space-x-2">
+                    <nav className="-mb-px flex space-x-2">
                     <button
                         onClick={() => setActiveTab('identity')}
-                        className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeTab === 'identity' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/30'}`}
+                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'identity' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
+                        <IdentificationIcon className="w-5 h-5" />
                         Identity Studio
                     </button>
                     <button
                         onClick={() => setActiveTab('creatives')}
-                        className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeTab === 'creatives' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/30'}`}
+                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'creatives' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
+                        <SparklesIcon className="w-5 h-5" />
                         Creative Lab
+                    </button>
+                     <button
+                        onClick={() => setActiveTab('thumbnails')}
+                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'thumbnails' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
+                    >
+                        <VideoIcon className="w-5 h-5" />
+                        Thumbnail Studio
                     </button>
                     <button
                         onClick={() => setActiveTab('library')}
-                        className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeTab === 'library' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/30'}`}
+                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'library' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
+                        <RectangleStackIcon className="w-5 h-5" />
                         Asset Library
                     </button>
                     </nav>
