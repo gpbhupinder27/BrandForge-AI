@@ -38,17 +38,17 @@ const AsyncImage: React.FC<AsyncImageProps> = ({ assetId, alt, className, ...pro
 
   if (isLoading) {
     return (
-      <div className={`flex items-center justify-center bg-gray-700/50 animate-pulse ${className}`}>
-        <ImageIcon className="w-1/3 h-1/3 text-gray-500" />
+      <div className={`flex items-center justify-center bg-slate-200 dark:bg-slate-700/50 animate-pulse ${className}`}>
+        <ImageIcon className="w-1/3 h-1/3 text-slate-400 dark:text-slate-500" />
       </div>
     );
   }
 
   if (!imageUrl) {
     return (
-        <div className={`flex flex-col items-center justify-center bg-gray-700/50 ${className}`}>
-            <ImageIcon className="w-1/3 h-1/3 text-gray-500" />
-            <p className="text-xs text-red-400 mt-2">Image not found</p>
+        <div className={`flex flex-col items-center justify-center bg-slate-200 dark:bg-slate-700/50 ${className}`}>
+            <ImageIcon className="w-1/3 h-1/3 text-slate-400 dark:text-slate-500" />
+            <p className="text-xs text-red-500 dark:text-red-400 mt-2">Image not found</p>
       </div>
     );
   }

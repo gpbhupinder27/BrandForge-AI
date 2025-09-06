@@ -1,70 +1,78 @@
 import React, { useState, useEffect } from 'react';
-import useLocalStorage from './hooks/useLocalStorage';
-import { Brand } from './types';
 import Header from './components/Header';
 import BrandDashboard from './components/BrandDashboard';
+import { Brand } from './types';
+import useLocalStorage from './hooks/useLocalStorage';
 import BrandWorkspace from './components/BrandWorkspace';
 import { initDB } from './services/imageDb';
+import Loader from './components/Loader';
 
-function App() {
+const App: React.FC = () => {
   const [brands, setBrands] = useLocalStorage<Brand[]>('brands', []);
-  const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
-  const [dbInitialized, setDbInitialized] = useState(false);
+  const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
+  const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    initDB().then(() => {
-      setDbInitialized(true);
-    }).catch(err => {
-        console.error("Failed to initialize database:", err);
-    });
+    const initialize = async () => {
+      await initDB();
+      setDbReady(true);
+    };
+    initialize();
   }, []);
 
-  const handleCreateBrand = (name: string, description: string) => {
-    const newBrand: Brand = {
-      id: crypto.randomUUID(),
-      name,
-      description,
-      assets: [],
-      createdAt: new Date().toISOString(),
-    };
-    setBrands(prevBrands => [...prevBrands, newBrand]);
-    setActiveBrandId(newBrand.id);
+  const handleSelectBrand = (id: string) => {
+    setSelectedBrandId(id);
   };
-  
-  const handleUpdateBrand = (updatedBrand: Brand) => {
-    setBrands(prevBrands => prevBrands.map(b => b.id === updatedBrand.id ? updatedBrand : b));
-  };
-  
-  const activeBrand = brands.find(b => b.id === activeBrandId);
 
-  if (!dbInitialized) {
-      return (
-        <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center font-sans">
-            <p>Initializing asset database...</p>
-        </div>
-      )
-  }
+  const handleBackToDashboard = () => {
+    setSelectedBrandId(null);
+  };
+
+  const handleAddBrand = (newBrand: Brand) => {
+    setBrands([...brands, newBrand]);
+  };
+
+  const handleDeleteBrand = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this brand and all its assets?')) {
+      setBrands(brands.filter(brand => brand.id !== id));
+      if (selectedBrandId === id) {
+        setSelectedBrandId(null);
+      }
+    }
+  };
+
+  const handleUpdateBrand = (updatedBrand: Brand) => {
+    setBrands(brands.map(brand => (brand.id === updatedBrand.id ? updatedBrand : brand)));
+  };
+
+  const selectedBrand = brands.find(brand => brand.id === selectedBrandId);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 font-sans">
       <Header />
-      <main className="container mx-auto max-w-7xl">
-        {activeBrand ? (
+      <main className="container mx-auto">
+        {!dbReady ? (
+          <div className="flex justify-center items-center h-[calc(100vh-80px)]">
+            <Loader message="Initializing asset database..." />
+          </div>
+        ) : selectedBrand ? (
           <BrandWorkspace
-            brand={activeBrand}
-            onBack={() => setActiveBrandId(null)}
+            key={selectedBrand.id} // Add key to force re-mount on brand change
+            brand={selectedBrand}
+            onBack={handleBackToDashboard}
             onUpdateBrand={handleUpdateBrand}
           />
         ) : (
           <BrandDashboard
             brands={brands}
-            onCreateBrand={handleCreateBrand}
-            onSelectBrand={setActiveBrandId}
+            onSelectBrand={handleSelectBrand}
+            onAddBrand={handleAddBrand}
+            onDeleteBrand={handleDeleteBrand}
           />
         )}
       </main>
     </div>
   );
-}
+};
 
 export default App;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Brand, BrandAsset, ColorPalette, TypographyPairing } from '../types';
 import { generateWithNanoBanana, fileToBase64, generateStructuredContent } from '../services/geminiService';
 import { storeImage, getImage } from '../services/imageDb';
@@ -7,11 +7,13 @@ import Loader from './Loader';
 import SparklesIcon from './icons/SparklesIcon';
 import PaletteIcon from './icons/PaletteIcon';
 import TypographyIcon from './icons/TypographyIcon';
-import EditIcon from './icons/EditIcon';
 import DownloadIcon from './icons/DownloadIcon';
 import RegenerateIcon from './icons/RegenerateIcon';
 import AsyncImage from './AsyncImage';
 import AssetPreviewModal from './AssetPreviewModal';
+import TagIcon from './icons/TagIcon';
+import ImageIcon from './icons/ImageIcon';
+import BeakerIcon from './icons/BeakerIcon';
 
 interface IdentityStudioProps {
   brand: Brand;
@@ -28,11 +30,50 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
   const [editingAsset, setEditingAsset] = useState<BrandAsset | null>(null);
   const [previewingAsset, setPreviewingAsset] = useState<BrandAsset | null>(null);
   const [editPrompt, setEditPrompt] = useState('');
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
   const typographyAsset = brand.assets.find(asset => asset.type === 'typography');
   const logoAssets = brand.assets.filter(asset => asset.type === 'logo').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
+  const allLogoTags = [...new Set(logoAssets.filter(a => !a.parentId).flatMap(a => a.tags || []))].sort();
+
+  const assetGroups = useMemo(() => {
+    const originals = logoAssets.filter(a => !a.parentId);
+    const variantsMap = logoAssets.reduce((map, asset) => {
+        if (asset.parentId) {
+            if (!map.has(asset.parentId)) map.set(asset.parentId, []);
+            map.get(asset.parentId)!.push(asset);
+        }
+        return map;
+    }, new Map<string, BrandAsset[]>());
+
+    return originals.map(original => ({
+        original,
+        variants: (variantsMap.get(original.id) || []).sort((a, b) => (a.variantLabel || '').localeCompare(b.variantLabel || '')),
+    }));
+  }, [logoAssets]);
+
+  const filteredAssetGroups = useMemo(() => {
+      if (activeFilters.length === 0) return assetGroups;
+      return assetGroups.filter(({ original }) => 
+          activeFilters.every(filter => original.tags?.includes(filter))
+      );
+  }, [assetGroups, activeFilters]);
+
+  const handleFilterToggle = (tag: string) => {
+    setActiveFilters(prev => 
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const handleUpdateAssetTags = (assetId: string, tags: string[]) => {
+    const updatedAssets = brand.assets.map(asset => 
+        asset.id === assetId ? { ...asset, tags } : asset
+    );
+    onUpdateBrand({ ...brand, assets: updatedAssets });
+  };
+
   const handleDownload = async (assetId: string, assetType: string) => {
     const imageUrl = await getImage(assetId);
     if (!imageUrl) {
@@ -152,18 +193,69 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
       setLoadingSection(null);
     }
   };
+
+  const handleGenerateLogoVariants = async (baseAsset: BrandAsset) => {
+    setIsLoading(true);
+    setLoadingSection('logo');
+    setError(null);
+    setPreviewingAsset(null); // Close the modal
+
+    try {
+        const baseImageUrl = await getImage(baseAsset.id);
+        if (!baseImageUrl) throw new Error("Base logo image not found.");
+        const response = await fetch(baseImageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], "base_logo.png", { type: blob.type });
+        const base64 = await fileToBase64(file);
+        const imageInputs = [{ data: base64, mimeType: file.type }];
+
+        const variantPrompt = `Create exactly 2 A/B test variations for the provided logo. The original prompt was: "${baseAsset.prompt}". Generate two distinct versions by making subtle but meaningful changes to either the color scheme, font style, or graphic element. Ensure the brand name '${brand.name}' remains clear. The variations should be different from each other and the original.`;
+        
+        const generatedParts = await generateWithNanoBanana(variantPrompt, imageInputs, 1024, 1024);
+        
+        const newVariantAssets: BrandAsset[] = [];
+        for (const [index, part] of generatedParts.filter(p => 'inlineData' in p).entries()) {
+            if ('inlineData' in part) {
+                const newId = crypto.randomUUID();
+                const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                await storeImage(newId, imageUrl);
+                newVariantAssets.push({
+                    id: newId,
+                    type: 'logo',
+                    prompt: `A/B Variant of: "${baseAsset.prompt}"`,
+                    createdAt: new Date().toISOString(),
+                    tags: baseAsset.tags || [],
+                    parentId: baseAsset.id,
+                    variantLabel: `Variant ${index + 1}`
+                });
+            }
+        }
+        
+        if (newVariantAssets.length === 0) {
+            throw new Error("The AI did not return any logo variations. Please try again.");
+        }
+
+        onUpdateBrand({ ...brand, assets: [...brand.assets, ...newVariantAssets] });
+
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred while generating logo variants.');
+    } finally {
+        setIsLoading(false);
+        setLoadingSection(null);
+    }
+  };
   
   const Section = ({ title, icon, subtitle, children, step, disabled = false }: { title: string, icon: React.ReactNode, subtitle: string, children: React.ReactNode, step: number, disabled?: boolean }) => (
-    <section className={`bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-700/50 transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-        <h3 className="text-2xl font-bold mb-2 flex items-center gap-3">
-            <span className="flex items-center justify-center w-8 h-8 text-sm font-bold text-indigo-300 bg-indigo-900/50 border border-indigo-500 rounded-full">{step}</span>
+    <section className={`bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 transition-opacity ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+        <h3 className="text-2xl font-bold mb-2 flex items-center gap-3 text-slate-900 dark:text-slate-100">
+            <span className="flex items-center justify-center w-8 h-8 text-sm font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-300 dark:border-indigo-500 rounded-full">{step}</span>
             {icon}
             {title}
         </h3>
-        <p className="text-slate-400 mb-6 ml-11">{subtitle}</p>
+        <p className="text-slate-500 dark:text-slate-400 mb-6 ml-11">{subtitle}</p>
         <div className="ml-11">
             {children}
-            {disabled && <p className="text-xs text-yellow-400 mt-2">Complete the previous step first.</p>}
+            {disabled && <p className="text-xs text-yellow-500 dark:text-yellow-400 mt-2">Complete the previous step first.</p>}
         </div>
     </section>
   );
@@ -174,26 +266,26 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
       <Section title="Color Palette" icon={<PaletteIcon className="w-6 h-6"/>} subtitle="Define your brand's look and feel with a unique color scheme." step={1}>
         {loadingSection === 'palette' ? <Loader message="Creating palette..."/> : paletteAsset?.palette ? (
             <div>
-                <h5 className="font-bold text-lg text-slate-100">{paletteAsset.palette.paletteName}</h5>
-                <p className="text-sm text-slate-400 mb-4">{paletteAsset.palette.description}</p>
+                <h5 className="font-bold text-lg text-slate-900 dark:text-slate-100">{paletteAsset.palette.paletteName}</h5>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{paletteAsset.palette.description}</p>
                 <div className="flex flex-wrap gap-4">
                     {paletteAsset.palette.colors.map(color => (
                         <div key={color.hex} className="text-center">
-                            <div className="w-20 h-20 rounded-full border-2 border-slate-600 shadow-md" style={{ backgroundColor: color.hex }}></div>
-                            <p className="text-sm mt-2 font-mono tracking-tighter">{color.hex}</p>
-                            <p className="text-xs text-slate-400">{color.name}</p>
+                            <div className="w-20 h-20 rounded-full border-2 border-slate-200 dark:border-slate-600 shadow-md" style={{ backgroundColor: color.hex }}></div>
+                            <p className="text-sm mt-2 font-mono tracking-tighter text-slate-700 dark:text-slate-300">{color.hex}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{color.name}</p>
                         </div>
                     ))}
                 </div>
             </div>
         ) : <p className="text-slate-500 italic">No color palette generated yet.</p>}
         <div className="mt-6 flex flex-wrap gap-4 items-center">
-          <input type="text" value={palettePrompt} onChange={e => setPalettePrompt(e.target.value)} placeholder="Describe a color palette (e.g., earthy tones)" className="flex-grow bg-slate-700 border border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow" disabled={isLoading} />
+          <input type="text" value={palettePrompt} onChange={e => setPalettePrompt(e.target.value)} placeholder="Describe a color palette (e.g., earthy tones)" className="flex-grow bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100" disabled={isLoading} />
           <div className="flex gap-2">
-            <button onClick={() => handleGeneratePalette(true)} disabled={isLoading || !palettePrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
+            <button onClick={() => handleGeneratePalette(true)} disabled={isLoading || !palettePrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
                 <SparklesIcon className="w-5 h-5"/> Generate
             </button>
-            <button onClick={() => handleGeneratePalette(false)} disabled={isLoading} title="Regenerate Palette" className="p-2.5 bg-slate-600 rounded-lg hover:bg-slate-500 transition-colors disabled:bg-slate-700 disabled:cursor-not-allowed">
+            <button onClick={() => handleGeneratePalette(false)} disabled={isLoading} title="Regenerate Palette" className="p-2.5 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed">
                 <RegenerateIcon className="w-5 h-5"/>
             </button>
           </div>
@@ -203,26 +295,26 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
       {/* Step 2: Typography */}
       <Section title="Typography Pairing" icon={<TypographyIcon className="w-6 h-6"/>} subtitle="Choose the fonts that will give your brand a voice." step={2} disabled={!paletteAsset}>
           {loadingSection === 'typography' ? <Loader message="Designing fonts..."/> : typographyAsset?.typography ? (
-              <div className="space-y-6 bg-slate-700/30 p-4 rounded-md">
+              <div className="space-y-6 bg-slate-100 dark:bg-slate-700/30 p-4 rounded-md">
                   <div>
-                      <p className="text-sm text-slate-400 uppercase tracking-wider font-semibold">Headline</p>
-                      <p className="text-4xl font-bold text-slate-50" style={{fontFamily: typographyAsset.typography.headlineFont.name}}>{typographyAsset.typography.headlineFont.name}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Headline</p>
+                      <p className="text-4xl font-bold text-slate-900 dark:text-slate-50" style={{fontFamily: typographyAsset.typography.headlineFont.name}}>{typographyAsset.typography.headlineFont.name}</p>
                       <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.headlineFont.description}</p>
                   </div>
                    <div>
-                      <p className="text-sm text-slate-400 uppercase tracking-wider font-semibold">Body</p>
-                      <p className="text-lg text-slate-200" style={{fontFamily: typographyAsset.typography.bodyFont.name}}>The quick brown fox jumps over the lazy dog. {typographyAsset.typography.bodyFont.name}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Body</p>
+                      <p className="text-lg text-slate-800 dark:text-slate-200" style={{fontFamily: typographyAsset.typography.bodyFont.name}}>The quick brown fox jumps over the lazy dog. {typographyAsset.typography.bodyFont.name}</p>
                       <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.bodyFont.description}</p>
                   </div>
               </div>
           ) : <p className="text-slate-500 italic">No typography pairing generated yet.</p>}
           <div className="mt-6 flex flex-wrap gap-4 items-center">
-            <input type="text" value={typographyPrompt} onChange={e => setTypographyPrompt(e.target.value)} placeholder="Describe a font style (e.g., elegant and classic)" className="flex-grow bg-slate-700 border border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow" disabled={isLoading} />
+            <input type="text" value={typographyPrompt} onChange={e => setTypographyPrompt(e.target.value)} placeholder="Describe a font style (e.g., elegant and classic)" className="flex-grow bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100" disabled={isLoading} />
             <div className="flex gap-2">
-              <button onClick={() => handleGenerateTypography(true)} disabled={isLoading || !typographyPrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
+              <button onClick={() => handleGenerateTypography(true)} disabled={isLoading || !typographyPrompt.trim()} className="flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
                   <SparklesIcon className="w-5 h-5"/> Generate
               </button>
-              <button onClick={() => handleGenerateTypography(false)} disabled={isLoading} title="Regenerate Typography" className="p-2.5 bg-slate-600 rounded-lg hover:bg-slate-500 transition-colors disabled:bg-slate-700 disabled:cursor-not-allowed">
+              <button onClick={() => handleGenerateTypography(false)} disabled={isLoading} title="Regenerate Typography" className="p-2.5 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:cursor-not-allowed">
                   <RegenerateIcon className="w-5 h-5"/>
               </button>
             </div>
@@ -235,14 +327,14 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
             value={logoPrompt}
             onChange={(e) => setLogoPrompt(e.target.value)}
             placeholder="e.g., A minimalist logo of a roaring lion's head, using geometric shapes."
-            className="w-full bg-slate-700 border border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow"
+            className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
             rows={3}
             disabled={isLoading}
           />
           <button
             onClick={() => handleGenerateLogo()}
             disabled={isLoading || !logoPrompt.trim()}
-            className="mt-4 flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
+            className="mt-4 flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
           >
             <SparklesIcon className="w-5 h-5" />
             {loadingSection === 'logo' ? 'Generating...' : 'Generate Logo'}
@@ -251,22 +343,76 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
           {loadingSection === 'logo' && <div className="my-8 flex justify-center"><Loader message="Generating logo..."/></div>}
           
           <div className="mt-8">
-            <h4 className="text-xl font-semibold mb-4 text-slate-200">Generated Logos</h4>
-            {logoAssets.length === 0 && !isLoading && <p className="text-slate-500 italic">Your generated logos will appear here.</p>}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {logoAssets.map((asset) => (
-                <div key={asset.id} className="group relative cursor-pointer aspect-square rounded-lg overflow-hidden bg-slate-700/50" onClick={() => setPreviewingAsset(asset)}>
-                  <AsyncImage assetId={asset.id} alt="Generated logo" className="w-full h-full object-contain p-2"/>
-                  <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2 text-center">
-                    <p className="text-xs text-slate-300 max-h-16 overflow-hidden">{asset.prompt}</p>
-                  </div>
+            <h4 className="text-xl font-semibold text-slate-800 dark:text-slate-200">Generated Logos</h4>
+            {allLogoTags.length > 0 && (
+                <div className="my-4 p-4 bg-slate-100 dark:bg-slate-700/40 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TagIcon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                      <h5 className="font-semibold text-slate-700 dark:text-slate-200">Filter by Tag</h5>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {allLogoTags.map(tag => (
+                            <button 
+                                key={tag} 
+                                onClick={() => handleFilterToggle(tag)}
+                                className={`px-3 py-1 text-sm rounded-full transition-colors font-semibold ${activeFilters.includes(tag) ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-600 hover:bg-slate-200 dark:hover:bg-slate-500 text-slate-800 dark:text-slate-100'}`}
+                            >
+                                {tag}
+                            </button>
+                        ))}
+                        {activeFilters.length > 0 && (
+                          <button onClick={() => setActiveFilters([])} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">Clear</button>
+                        )}
+                    </div>
                 </div>
-              ))}
-            </div>
+            )}
+            
+            {logoAssets.length === 0 && !isLoading ? (
+              <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg mt-4">
+                <ImageIcon className="w-12 h-12 mx-auto text-slate-400 dark:text-slate-500" />
+                <h5 className="mt-4 text-lg font-semibold text-slate-700 dark:text-slate-300">Ready to Create?</h5>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Use the prompt above to generate your first logo.</p>
+              </div>
+            ) : filteredAssetGroups.length === 0 && !isLoading ? (
+              <div className="text-center py-12">
+                <p className="text-slate-500 dark:text-slate-400">No logos match your selected filters.</p>
+              </div>
+            ) : (
+              <div className="space-y-8 mt-4">
+                {filteredAssetGroups.map(({ original, variants }) => (
+                  <div key={original.id} className="p-4 border border-slate-200 dark:border-slate-700/50 rounded-lg bg-white dark:bg-slate-800/20">
+                    <div className="group relative cursor-pointer aspect-square rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50" onClick={() => setPreviewingAsset(original)}>
+                        <AsyncImage assetId={original.id} alt="Generated logo" className="w-full h-full object-contain p-2"/>
+                        <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 text-left">
+                          <p className="text-xs text-slate-300 max-h-12 overflow-hidden">{original.prompt}</p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {original.tags?.map(tag => (
+                              <span key={tag} className="text-xs bg-indigo-500/80 text-white px-1.5 py-0.5 rounded-full">{tag}</span>
+                            ))}
+                          </div>
+                        </div>
+                    </div>
+                    {variants.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <h5 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-2"><BeakerIcon className="w-4 h-4"/> A/B Test Variants</h5>
+                            <div className="grid grid-cols-2 gap-2">
+                                {variants.map(variant => (
+                                    <div key={variant.id} className="group relative rounded-lg bg-slate-100 dark:bg-slate-800/60 overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer aspect-square flex justify-center items-center" onClick={() => setPreviewingAsset(variant)}>
+                                        <span className="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full z-10 font-semibold">{variant.variantLabel}</span>
+                                        <AsyncImage assetId={variant.id} alt={`Variant logo: ${variant.prompt}`} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"/>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
       </Section>
 
-      {error && <p className="mt-4 text-center text-red-400">Error: {error}</p>}
+      {error && <p className="mt-4 text-center text-red-500 dark:text-red-400">Error: {error}</p>}
       
       {previewingAsset && (
         <AssetPreviewModal
@@ -278,30 +424,33 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                 setEditingAsset(asset);
                 setEditPrompt(asset.prompt);
             }}
+            onUpdateTags={handleUpdateAssetTags}
+            availableTags={allLogoTags}
+            onGenerateVariants={handleGenerateLogoVariants}
         />
       )}
 
        {editingAsset && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-fade-in">
-            <div className="bg-slate-800 rounded-lg p-6 max-w-2xl w-full shadow-2xl border border-slate-700">
-                <h3 className="text-xl font-semibold mb-4 text-slate-100">Edit Logo</h3>
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700">
+                <h3 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">Edit Logo</h3>
                 <div className="flex flex-col sm:flex-row gap-4 items-start">
-                    <div className="w-32 h-32 bg-slate-700 rounded-md p-1 flex-shrink-0"><AsyncImage assetId={editingAsset.id} alt="logo to edit" className="w-full h-full object-contain"/></div>
+                    <div className="w-32 h-32 bg-slate-100 dark:bg-slate-700 rounded-md p-1 flex-shrink-0"><AsyncImage assetId={editingAsset.id} alt="logo to edit" className="w-full h-full object-contain"/></div>
                     <div className="flex-1">
-                        <p className="text-sm text-slate-400 mb-2">Describe the changes you'd like to make:</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Describe the changes you'd like to make:</p>
                         <textarea
                             value={editPrompt}
                             onChange={(e) => setEditPrompt(e.target.value)}
                             placeholder="e.g., Make this blue, change the font to serif"
-                            className="w-full bg-slate-700 border border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow"
+                            className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
                             rows={3}
                             disabled={isLoading}
                         />
                     </div>
                 </div>
                 <div className="flex gap-4 mt-6 justify-end">
-                    <button onClick={() => setEditingAsset(null)} disabled={isLoading} className="px-4 py-2 bg-slate-600 font-semibold rounded-lg hover:bg-slate-500 transition-colors">Cancel</button>
-                    <button onClick={() => handleGenerateLogo(editingAsset)} disabled={isLoading || !editPrompt.trim()} className="px-4 py-2 bg-indigo-600 font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-900/50 disabled:cursor-not-allowed">{loadingSection === 'logo' ? "Saving..." : "Generate Edit"}</button>
+                    <button onClick={() => setEditingAsset(null)} disabled={isLoading} className="px-4 py-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">Cancel</button>
+                    <button onClick={() => handleGenerateLogo(editingAsset)} disabled={isLoading || !editPrompt.trim()} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">{loadingSection === 'logo' ? "Saving..." : "Generate Edit"}</button>
                 </div>
             </div>
         </div>

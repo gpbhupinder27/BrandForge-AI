@@ -24,6 +24,9 @@ export interface BrandAsset {
   palette?: ColorPalette;
   typography?: TypographyPairing;
   createdAt: string;
+  tags?: string[];
+  parentId?: string; // ID of the original asset this is a variation of
+  variantLabel?: string; // e.g., 'Variant A', 'B', etc.
 }
 
 export interface Brand {

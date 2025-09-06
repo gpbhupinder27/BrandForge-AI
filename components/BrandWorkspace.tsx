@@ -97,17 +97,6 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
     }
   };
 
-
-  const handleAddAsset = (newAssets: BrandAsset[]) => {
-    if (newAssets.length === 0) return;
-
-    const updatedBrand = {
-      ...brand,
-      assets: [...brand.assets, ...newAssets],
-    };
-    onUpdateBrand(updatedBrand);
-  };
-
   const handleExportBrand = async () => {
     setIsExporting(true);
     try {
@@ -156,36 +145,36 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
 
   return (
     <div className="p-4 sm:p-8">
-      <button onClick={onBack} className="flex items-center gap-2 mb-6 text-indigo-400 hover:text-indigo-300 transition-colors font-semibold">
+      <button onClick={onBack} className="flex items-center gap-2 mb-6 text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors font-semibold">
         <ArrowLeftIcon className="w-5 h-5" />
         Back to Dashboard
       </button>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-6 p-6 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-6 p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-lg">
         <div className="flex-1">
-            <h2 className="text-4xl font-bold text-slate-50">{brand.name}</h2>
-            <p className="text-slate-400 mt-2 max-w-2xl">{brand.description}</p>
+            <h2 className="text-4xl font-bold text-slate-900 dark:text-slate-50">{brand.name}</h2>
+            <p className="text-slate-600 dark:text-slate-400 mt-2 max-w-2xl">{brand.description}</p>
         </div>
         <div className="flex items-center gap-4">
-             <button onClick={handleExportBrand} disabled={isExporting} className="flex items-center gap-2 px-4 py-2 bg-slate-600 rounded-lg font-semibold hover:bg-slate-500 transition-colors disabled:opacity-50 disabled:cursor-wait">
+             <button onClick={handleExportBrand} disabled={isExporting} className="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg font-semibold hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors disabled:opacity-50 disabled:cursor-wait">
                 <ExportIcon className="w-5 h-5" />
                 {isExporting ? 'Exporting...' : 'Export All'}
             </button>
-            {logoAsset && <div className="w-24 h-24 bg-slate-700 rounded-lg p-1 shadow-lg"><AsyncImage assetId={logoAsset.id} alt="Brand Logo" className="w-full h-full object-contain" /></div>}
+            {logoAsset && <div className="w-24 h-24 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shadow-lg"><AsyncImage assetId={logoAsset.id} alt="Brand Logo" className="w-full h-full object-contain" /></div>}
         </div>
       </div>
 
-      <div className="border-b border-slate-700 mb-8">
+      <div className="border-b border-slate-200 dark:border-slate-700 mb-8">
         <nav className="flex space-x-2">
           <button
             onClick={() => setActiveTab('identity')}
-            className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeTab === 'identity' ? 'text-indigo-400 bg-slate-800/50 border-b-2 border-indigo-400' : 'text-slate-400 hover:text-white hover:bg-slate-800/30'}`}
+            className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeTab === 'identity' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/30'}`}
           >
             Identity Studio
           </button>
           <button
             onClick={() => setActiveTab('creatives')}
-            className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeTab === 'creatives' ? 'text-indigo-400 bg-slate-800/50 border-b-2 border-indigo-400' : 'text-slate-400 hover:text-white hover:bg-slate-800/30'}`}
+            className={`py-2 px-4 font-semibold rounded-t-md transition-colors ${activeTab === 'creatives' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-b-2 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-slate-800/30'}`}
           >
             Creative Lab
           </button>
@@ -196,12 +185,12 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
         {isInitializing ? (
            <div className="flex flex-col items-center justify-center p-16">
                 <Loader message="Forging your initial brand identity..." />
-                <p className="mt-4 text-slate-400 text-center max-w-md">This may take a moment. We're generating a color palette, typography, and a logo to get you started.</p>
+                <p className="mt-4 text-slate-500 dark:text-slate-400 text-center max-w-md">This may take a moment. We're generating a color palette, typography, and a logo to get you started.</p>
             </div>
         ) : activeTab === 'identity' ? (
           <IdentityStudio brand={brand} onUpdateBrand={onUpdateBrand} />
         ) : (
-          <CreativeLab brand={brand} onAddAsset={handleAddAsset} />
+          <CreativeLab brand={brand} onUpdateBrand={onUpdateBrand} />
         )}
       </div>
     </div>

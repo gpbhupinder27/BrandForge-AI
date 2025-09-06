@@ -1,116 +1,86 @@
 import React, { useState } from 'react';
 import { Brand } from '../types';
 import PlusIcon from './icons/PlusIcon';
-import ImageIcon from './icons/ImageIcon';
+import CreateBrandModal from './CreateBrandModal';
 import AsyncImage from './AsyncImage';
+import ChevronRightIcon from './icons/ChevronRightIcon';
+import RectangleStackIcon from './icons/RectangleStackIcon';
+import Homepage from './Homepage';
 
 interface BrandDashboardProps {
   brands: Brand[];
-  onCreateBrand: (name: string, description: string) => void;
-  onSelectBrand: (brandId: string) => void;
+  onSelectBrand: (id: string) => void;
+  onAddBrand: (newBrand: Brand) => void;
+  onDeleteBrand: (id: string) => void;
 }
 
-const BrandDashboard: React.FC<BrandDashboardProps> = ({ brands, onCreateBrand, onSelectBrand }) => {
-  const [newBrandName, setNewBrandName] = useState('');
-  const [newBrandDesc, setNewBrandDesc] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
+const BrandDashboard: React.FC<BrandDashboardProps> = ({ brands, onSelectBrand, onAddBrand, onDeleteBrand }) => {
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newBrandName.trim()) {
-      onCreateBrand(newBrandName.trim(), newBrandDesc.trim());
-      setNewBrandName('');
-      setNewBrandDesc('');
-      setShowCreateForm(false);
-    }
-  };
+  if (brands.length === 0) {
+    return <Homepage onGetStarted={() => setIsCreateModalOpen(true)} />;
+  }
 
   return (
     <div className="p-4 sm:p-8">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold text-slate-50">Brand Workspaces</h2>
-        {!showCreateForm && (
-            <button
-            onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 rounded-lg shadow-lg hover:bg-indigo-500 transition-all duration-300 transform hover:scale-105"
-          >
-            <PlusIcon className="w-5 h-5" />
-            <span className="font-semibold">Create New Brand</span>
-          </button>
-        )}
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Your Brands</h2>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors shadow-md"
+        >
+          <PlusIcon className="w-5 h-5" />
+          Create New Brand
+        </button>
       </div>
 
-      {showCreateForm && (
-        <form onSubmit={handleCreate} className="mb-8 p-6 bg-slate-800/70 border border-slate-700 rounded-lg shadow-2xl animate-fade-in">
-          <h3 className="text-xl font-semibold mb-4 text-slate-100">New Brand Workspace</h3>
-          <div className="space-y-4">
-            <input
-              type="text"
-              value={newBrandName}
-              onChange={(e) => setNewBrandName(e.target.value)}
-              placeholder="Brand Name (e.g., CoffeeNova)"
-              className="w-full bg-slate-700 border border-slate-600 rounded-md px-4 py-2 text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow"
-              required
-            />
-            <textarea
-              value={newBrandDesc}
-              onChange={(e) => setNewBrandDesc(e.target.value)}
-              placeholder="Brand Description (e.g., A premium, ethically-sourced coffee roaster)"
-              className="w-full bg-slate-700 border border-slate-600 rounded-md px-4 py-2 text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow"
-              rows={3}
-            />
-          </div>
-          <div className="flex gap-4 mt-6">
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-indigo-600 rounded-lg font-semibold hover:bg-indigo-500 transition-colors shadow-md"
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {brands.map((brand) => {
+          const logoAsset = brand.assets.find(a => a.type === 'logo');
+          return (
+            <div
+              key={brand.id}
+              className="bg-white dark:bg-slate-800/50 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-indigo-500 dark:hover:border-indigo-400 group"
+              onClick={() => onSelectBrand(brand.id)}
             >
-              Create Workspace
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreateForm(false)}
-              className="px-5 py-2.5 bg-slate-600 rounded-lg font-semibold hover:bg-slate-500 transition-colors shadow-md"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      {brands.length === 0 && !showCreateForm ? (
-        <div className="text-center py-20 border-2 border-dashed border-slate-700 rounded-lg">
-            <h3 className="text-xl text-slate-400 font-semibold">No brands yet.</h3>
-            <p className="text-slate-500 mt-2">Click "Create New Brand" to get started.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {brands.map((brand) => {
-             const logo = brand.assets.find(a => a.type === 'logo');
-            return (
-                <div
-                key={brand.id}
-                onClick={() => onSelectBrand(brand.id)}
-                className="bg-slate-800 rounded-lg shadow-lg overflow-hidden cursor-pointer group hover:ring-2 hover:ring-indigo-500 transition-all duration-300 transform hover:-translate-y-1"
-              >
-                <div className="h-48 bg-slate-700 flex items-center justify-center p-2 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-800 via-slate-700/50 to-transparent"></div>
-                    {logo ? (
-                        <AsyncImage assetId={logo.id} alt={`${brand.name} logo`} className="h-full w-full object-contain p-4 drop-shadow-lg"/>
+              <div className="p-6 cursor-pointer">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 pr-4">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{brand.name}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 h-10 overflow-hidden text-ellipsis">
+                      {brand.description}
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shadow-inner flex-shrink-0">
+                    {logoAsset ? (
+                      <AsyncImage assetId={logoAsset.id} alt={`${brand.name} logo`} className="w-full h-full object-contain" />
                     ) : (
-                        <ImageIcon className="w-16 h-16 text-slate-500"/>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <RectangleStackIcon className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                      </div>
                     )}
+                  </div>
                 </div>
-                <div className="p-5">
-                  <h3 className="text-xl font-bold text-slate-100">{brand.name}</h3>
-                  <p className="text-slate-400 text-sm mt-1 h-10 overflow-hidden">{brand.description}</p>
-                  <p className="text-xs font-medium text-slate-500 mt-4">{brand.assets.length} assets</p>
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                        {brand.assets.length} assets
+                    </p>
+                    <div className="flex items-center gap-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                        Open Workspace
+                        <ChevronRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                    </div>
                 </div>
               </div>
-            )
-          })}
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
+
+      <CreateBrandModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onAddBrand={onAddBrand}
+      />
     </div>
   );
 };
