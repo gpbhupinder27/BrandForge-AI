@@ -105,6 +105,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
   const [latestCampaignAssets, setLatestCampaignAssets] = useState<BrandAsset[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const campaignFileInputRef = useRef<HTMLInputElement>(null);
+  const [isCreativeTemplateModalOpen, setIsCreativeTemplateModalOpen] = useState(false);
   
   const logoAsset = brand.assets.find(asset => asset.type === 'logo');
   const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
@@ -187,6 +188,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     // Add brand context for the AI to tailor the creative
     const contextualPrompt = `For a brand named "${brand.name}" which is about "${brand.description}", please generate a creative asset based on the following brief: "${finalPrompt}". Make sure the result is perfectly aligned with the brand's identity.`;
     setPrompt(contextualPrompt);
+    setIsCreativeTemplateModalOpen(false);
   };
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<File | null>>) => {
@@ -578,15 +580,14 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                         <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-slate-100">Single Creative</h3>
                         
                         <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {templates.map(template => (
-                                    <button key={template.name} onClick={() => handleTemplateClick(template.prompt)} disabled={isLoading} className="text-left p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50">
-                                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{template.name}</span></div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
-                                    </button>
-                                ))}
-                            </div>
+                           <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
+                            <button 
+                                onClick={() => setIsCreativeTemplateModalOpen(true)} 
+                                disabled={isLoading}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 font-semibold bg-slate-100 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                            >
+                                Browse Creative Templates
+                            </button>
                             {(brand.customTemplates || []).length > 0 && (
                                 <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700/50">
                                     <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-2"><BookmarkIcon className="w-5 h-5"/> Your Custom Templates</h4>
@@ -673,15 +674,16 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                                 ))}
                             </div>
                         </div>
-
-                        <button
-                            onClick={() => handleGenerate()}
-                            disabled={isLoading || !prompt.trim()}
-                            className="!mt-6 flex-shrink-0 flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
-                        >
-                            <SparklesIcon className="w-5 h-5" />
-                            {isLoading && loadingMessage.startsWith("Crafting") ? 'Generating...' : 'Generate Creative'}
-                        </button>
+                        <div className="!mt-6 flex justify-center">
+                            <button
+                                onClick={() => handleGenerate()}
+                                disabled={isLoading || !prompt.trim()}
+                                className="flex-shrink-0 flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
+                            >
+                                <SparklesIcon className="w-5 h-5" />
+                                {isLoading && loadingMessage.startsWith("Crafting") ? 'Generating...' : 'Generate Creative'}
+                            </button>
+                        </div>
                     </div>
                 )}
                 {activeCreativeTab === 'campaign' && (
@@ -743,11 +745,12 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                                 ))}
                             </div>
                         </div>
-
-                        <button onClick={handleGenerateCampaign} disabled={isLoading || !campaignPrompt.trim() || selectedCampaignTypes.length === 0} className="!mt-6 flex items-center gap-2 px-6 py-2.5 font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors disabled:bg-purple-600/50 dark:disabled:bg-purple-900/50 disabled:cursor-not-allowed shadow-md">
-                            <SparklesIcon className="w-5 h-5"/>
-                            {isLoading && loadingMessage.startsWith("Generating Campaign") ? 'Generating...' : 'Generate Campaign Pack'}
-                        </button>
+                        <div className="!mt-6 flex justify-center">
+                            <button onClick={handleGenerateCampaign} disabled={isLoading || !campaignPrompt.trim() || selectedCampaignTypes.length === 0} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors disabled:bg-purple-600/50 dark:disabled:bg-purple-900/50 disabled:cursor-not-allowed shadow-md">
+                                <SparklesIcon className="w-5 h-5"/>
+                                {isLoading && loadingMessage.startsWith("Generating Campaign") ? 'Generating...' : 'Generate Campaign Pack'}
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -828,6 +831,32 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
         )}
       </div>
       
+       {isCreativeTemplateModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsCreativeTemplateModalOpen(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Creative Templates</h2>
+                <button onClick={() => setIsCreativeTemplateModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
+                    <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
+                </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+              {templates.map(template => (
+                  <button 
+                      key={template.name} 
+                      onClick={() => handleTemplateClick(template.prompt)} 
+                      disabled={isLoading} 
+                      className="text-left p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50"
+                  >
+                      <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-slate-900 dark:text-slate-100">{template.name}</span></div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{template.description}</p>
+                  </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
        {previewingAsset && (
         <AssetPreviewModal
             asset={previewingAsset}

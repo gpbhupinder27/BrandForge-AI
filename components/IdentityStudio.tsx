@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Brand, BrandAsset, ColorPalette, TypographyPairing } from '../types';
 import { generateWithNanoBanana, fileToBase64, generateStructuredContent, describeImage, generatePromptSuggestions } from '../services/geminiService';
@@ -101,6 +99,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
   const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; }[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestionLoadingMessage, setSuggestionLoadingMessage] = useState('Thinking...');
+  const [isLogoTemplateModalOpen, setIsLogoTemplateModalOpen] = useState(false);
   
   const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
   const typographyAsset = brand.assets.find(asset => asset.type === 'typography');
@@ -182,6 +181,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
     // Replace placeholders with brand-specific details
     finalPrompt = finalPrompt.replace(/\[Brand Name\]/gi, brand.name);
     setLogoPrompt(finalPrompt);
+    setIsLogoTemplateModalOpen(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -255,6 +255,32 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
         setLoadingSection(null);
     }
   };
+
+  const handleColorChange = (index: number, newHex: string) => {
+    if (!paletteAsset) return;
+
+    // Allow typing '#' and partial hex codes without validating mid-type
+    const cleanHex = newHex.startsWith('#') ? newHex : `#${newHex}`;
+    if (cleanHex.length > 7) return;
+
+    const updatedColors = [...paletteAsset.palette.colors];
+    updatedColors[index] = { ...updatedColors[index], hex: cleanHex };
+
+    const updatedPalette: ColorPalette = { ...paletteAsset.palette, colors: updatedColors };
+    const updatedAsset: BrandAsset = { ...paletteAsset, palette: updatedPalette };
+    const updatedAssets = brand.assets.map(a => a.id === paletteAsset.id ? updatedAsset : a);
+    onUpdateBrand({ ...brand, assets: updatedAssets });
+  };
+  
+  const handleHexBlur = (index: number, currentHex: string) => {
+      // On blur, validate and format the hex code
+      if (!/^#[0-9a-f]{6}$/i.test(currentHex)) {
+          let validHex = currentHex.replace(/[^0-9a-f]/gi, '').substring(0, 6);
+          validHex = `#${validHex.padEnd(6, '0')}`;
+          handleColorChange(index, validHex);
+      }
+  }
+
 
   const handleGenerateTypography = async (useCustomPrompt: boolean) => {
     setIsLoading(true);
@@ -451,11 +477,26 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                   <h5 className="font-bold text-lg text-slate-900 dark:text-slate-100">{paletteAsset.palette.paletteName}</h5>
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{paletteAsset.palette.description}</p>
                   <div className="flex flex-wrap gap-4">
-                      {paletteAsset.palette.colors.map(color => (
-                          <div key={color.hex} className="text-center">
-                              <div className="w-20 h-20 rounded-full border-2 border-slate-200 dark:border-slate-600 shadow-md" style={{ backgroundColor: color.hex }}></div>
-                              <p className="text-sm mt-2 font-mono tracking-tighter text-slate-700 dark:text-slate-300">{color.hex}</p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{color.name}</p>
+                      {paletteAsset.palette.colors.map((color, index) => (
+                          <div key={index} className="text-center">
+                              <label className="cursor-pointer">
+                                  <div className="w-20 h-20 rounded-full border-2 border-slate-200 dark:border-slate-600 shadow-md" style={{ backgroundColor: color.hex }}></div>
+                                  <input 
+                                    type="color" 
+                                    value={color.hex} 
+                                    onChange={(e) => handleColorChange(index, e.target.value)}
+                                    className="absolute opacity-0 w-0 h-0"
+                                  />
+                              </label>
+                              <input
+                                type="text"
+                                value={color.hex}
+                                onChange={(e) => handleColorChange(index, e.target.value)}
+                                onBlur={(e) => handleHexBlur(index, e.target.value)}
+                                className="w-20 mt-2 p-1 text-center font-mono tracking-tighter text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                                maxLength={7}
+                              />
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{color.name}</p>
                           </div>
                       ))}
                   </div>
@@ -524,9 +565,11 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                           </select>
                       </div>
                   </div>
-                  <button onClick={handleSetManualFonts} disabled={isLoading || !manualHeadlineFont.trim() || !manualBodyFont.trim()} className="mt-4 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
-                      Set Manual Fonts
-                  </button>
+                  <div className="mt-4 flex justify-end">
+                      <button onClick={handleSetManualFonts} disabled={isLoading || !manualHeadlineFont.trim() || !manualBodyFont.trim()} className="px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">
+                          Set Manual Fonts
+                      </button>
+                  </div>
               </div>
             </div>
         </Section>
@@ -535,20 +578,14 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
       {/* Step 3: Logo Generation */}
       <Section title="Logo Generation" icon={<SparklesIcon className="w-6 h-6"/>} subtitle="Bring your brand to life with a unique logo." step={3} disabled={!typographyAsset}>
           <div className="space-y-4 p-4 mb-6 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
-              <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {logoTemplates.map(template => (
-                      <button 
-                          key={template.name} 
-                          onClick={() => handleTemplateClick(template.prompt)} 
-                          disabled={isLoading} 
-                          className="text-left p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                      >
-                          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{template.name}</span></div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
-                      </button>
-                  ))}
-              </div>
+             <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
+               <button 
+                  onClick={() => setIsLogoTemplateModalOpen(true)} 
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 font-semibold bg-slate-100 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+              >
+                  Browse Templates
+              </button>
           </div>
           
             <div className="flex justify-between items-center mb-2">
@@ -629,14 +666,16 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
               )}
           </div>
           
-          <button
-            onClick={() => handleGenerateLogo()}
-            disabled={isLoading || !logoPrompt.trim()}
-            className="mt-4 flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
-          >
-            <SparklesIcon className="w-5 h-5" />
-            {loadingSection === 'logo' ? 'Generating...' : 'Generate Logo'}
-          </button>
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => handleGenerateLogo()}
+              disabled={isLoading || !logoPrompt.trim()}
+              className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md"
+            >
+              <SparklesIcon className="w-5 h-5" />
+              {loadingSection === 'logo' ? 'Generating...' : 'Generate Logo'}
+            </button>
+          </div>
           
           {loadingSection === 'logo' && <div className="my-8 flex justify-center"><Loader message="Generating logo..."/></div>}
           
@@ -712,6 +751,32 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
 
       {error && <p className="mt-4 text-center text-red-500 dark:text-red-400">Error: {error}</p>}
       
+      {isLogoTemplateModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsLogoTemplateModalOpen(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Logo Templates</h2>
+                <button onClick={() => setIsLogoTemplateModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
+                    <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
+                </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+              {logoTemplates.map(template => (
+                  <button 
+                      key={template.name} 
+                      onClick={() => handleTemplateClick(template.prompt)} 
+                      disabled={isLoading} 
+                      className="text-left p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50"
+                  >
+                      <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-slate-900 dark:text-slate-100">{template.name}</span></div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{template.description}</p>
+                  </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewingAsset && (
         <AssetPreviewModal
             asset={previewingAsset}

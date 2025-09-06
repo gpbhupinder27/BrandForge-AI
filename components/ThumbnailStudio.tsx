@@ -585,11 +585,12 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                         ))}
                      </div>
                 </div>
-
-                <button onClick={handleGenerateThumbnail} disabled={isLoading || (!baseImagePrompt.trim() && !baseImageFile)} className="w-full flex items-center justify-center gap-2 px-6 py-3 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md">
-                    <SparklesIcon className="w-5 h-5" />
-                    {isLoading ? 'Generating...' : 'Generate Thumbnail'}
-                </button>
+                <div className="w-full flex justify-center">
+                    <button onClick={handleGenerateThumbnail} disabled={isLoading || (!baseImagePrompt.trim() && !baseImageFile)} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed shadow-md">
+                        <SparklesIcon className="w-5 h-5" />
+                        {isLoading ? 'Generating...' : 'Generate Thumbnail'}
+                    </button>
+                </div>
                  {error && <p className="text-center text-red-500 dark:text-red-400 text-sm">Error: {error}</p>}
             </div>
 
