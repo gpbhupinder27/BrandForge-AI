@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Brand } from '../types';
 import PlusIcon from './icons/PlusIcon';
@@ -5,7 +6,6 @@ import CreateBrandModal from './CreateBrandModal';
 import AsyncImage from './AsyncImage';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import RectangleStackIcon from './icons/RectangleStackIcon';
-import Homepage from './Homepage';
 
 interface BrandDashboardProps {
   brands: Brand[];
@@ -19,21 +19,25 @@ const BrandDashboard: React.FC<BrandDashboardProps> = ({ brands, onSelectBrand, 
 
   return (
     <>
-      {brands.length === 0 ? (
-        <Homepage onGetStarted={() => setIsCreateModalOpen(true)} />
-      ) : (
-        <div className="p-4 sm:p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Your Brands</h2>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors shadow-md"
-            >
-              <PlusIcon className="w-5 h-5" />
-              Create New Brand
-            </button>
-          </div>
+      <div className="p-4 sm:p-8">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Your Brands</h2>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors shadow-md"
+          >
+            <PlusIcon className="w-5 h-5" />
+            Create New Brand
+          </button>
+        </div>
 
+        {brands.length === 0 ? (
+          <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+            <RectangleStackIcon className="w-16 h-16 mx-auto text-slate-400 dark:text-slate-500" />
+            <h5 className="mt-4 text-lg font-semibold text-slate-700 dark:text-slate-300">No Brands Yet</h5>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">Click "Create New Brand" to get started and build your first brand identity.</p>
+          </div>
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {brands.map((brand) => {
               const logoAsset = brand.assets.find(a => a.type === 'logo');
@@ -75,8 +79,9 @@ const BrandDashboard: React.FC<BrandDashboardProps> = ({ brands, onSelectBrand, 
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
 
       <CreateBrandModal
         isOpen={isCreateModalOpen}
