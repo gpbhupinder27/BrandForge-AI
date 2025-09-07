@@ -822,7 +822,6 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                                             >
                                                 <AsyncImage assetId={original.id} alt="Generated logo" className="w-full h-full object-contain p-2"/>
                                                 <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 text-left">
-                                                <p className="text-xs text-slate-300 max-h-12 overflow-hidden">{original.prompt}</p>
                                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                                     {original.tags?.map(tag => (
                                                     <span key={tag} className="text-xs bg-indigo-500/80 text-white px-1.5 py-0.5 rounded-full">{tag}</span>

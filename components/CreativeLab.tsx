@@ -5,7 +5,6 @@ import { storeImage, getImage } from '../services/imageDb';
 import Loader from './Loader';
 import SparklesIcon from './icons/SparklesIcon';
 import AsyncImage from './AsyncImage';
-import AssetPreviewModal from './AssetPreviewModal';
 import ImageIcon from './icons/ImageIcon';
 import TagIcon from './icons/TagIcon';
 import LightbulbIcon from './icons/LightbulbIcon';
@@ -16,6 +15,8 @@ import XMarkIcon from './icons/XMarkIcon';
 import ChatBubbleIcon from './icons/ChatBubbleIcon';
 import BeakerIcon from './icons/BeakerIcon';
 import VideoIcon from './icons/VideoIcon';
+// Fix: Import AssetPreviewModal to resolve 'Cannot find name' error.
+import AssetPreviewModal from './AssetPreviewModal';
 
 interface CreativeLabProps {
   brand: Brand;
@@ -71,6 +72,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
   const [campaignPrompt, setCampaignPrompt] = useState('');
   const [selectedCampaignTypes, setSelectedCampaignTypes] = useState<AssetType[]>(['social_ad']);
   const [logoPosition, setLogoPosition] = useState<LogoPosition>('top-right');
+  const [addLogo, setAddLogo] = useState(true);
   const [productImage, setProductImage] = useState<File | null>(null);
   const [productImageDims, setProductImageDims] = useState<{ width: number; height: number } | null>(null);
   const [campaignImage, setCampaignImage] = useState<File | null>(null);
@@ -207,39 +209,39 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
     }
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, setter: React.Dispatch<React.SetStateAction<File | null>>, inputRef: React.RefObject<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.currentTarget.classList.remove('border-indigo-500', 'dark:border-indigo-400');
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      if (file.type.startsWith('image/')) {
-        setter(file);
-        if (inputRef.current) {
-          inputRef.current.files = e.dataTransfer.files;
-        }
-      }
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, logoPos: LogoPosition | null, baseAsset?: BrandAsset, dims?: {width: number, height: number} | null): Promise<BrandAsset[]> => {
-    if (!logoAsset) {
-        throw new Error("Please generate a logo in the Identity Studio before creating marketing assets.");
-    }
+ const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, logoPos: LogoPosition | null, baseAsset?: BrandAsset, dims?: {width: number, height: number} | null): Promise<BrandAsset[]> => {
     let imageInputs = [];
+    const logoAsset = brand.assets.find(asset => asset.type === 'logo' && asset.isPrimary) || brand.assets.find(asset => asset.type === 'logo');
+    let logoPlacementInstruction = '';
 
-    const logoImageUrl = await getImage(logoAsset.id);
-    if (!logoImageUrl) throw new Error("Logo image not found in database.");
-    const logoResponse = await fetch(logoImageUrl);
-    const logoBlob = await logoResponse.blob();
-    const logoFile = new File([logoBlob], "logo.png", { type: logoBlob.type });
-    const logoBase64 = await fileToBase64(logoFile);
-    imageInputs.push({ data: logoBase64, mimeType: logoFile.type });
+    const shouldAddLogo = (activeCreativeTab === 'single' && addLogo && logoPos !== 'none') || (activeCreativeTab === 'campaign');
+
+    if (shouldAddLogo && logoAsset) {
+        const logoImageUrl = await getImage(logoAsset.id);
+        if (!logoImageUrl) throw new Error("Logo image not found in database.");
+        const logoResponse = await fetch(logoImageUrl);
+        const logoBlob = await logoResponse.blob();
+        const logoFile = new File([logoBlob], "logo.png", { type: logoBlob.type });
+        const logoBase64 = await fileToBase64(logoFile);
+        imageInputs.push({ data: logoBase64, mimeType: logoFile.type });
+
+        const baseLogoInstruction = `CRITICAL: The first image provided is the brand's logo, which is on a plain solid white background. You MUST remove this white background completely, treating it as transparent. Integrate ONLY the logo's graphic/text seamlessly into your design. The logo should be small and unobtrusive, occupying no more than 10% of the image's width. DO NOT show the square white background of the logo file.`;
+        
+        const effectiveLogoPos = activeCreativeTab === 'single' ? logoPos : 'bottom-right'; // Default for campaigns
+
+        if (effectiveLogoPos && effectiveLogoPos !== 'none') {
+            if (effectiveLogoPos === 'watermark') {
+                logoPlacementInstruction = baseLogoInstruction + ' Place this logo as a subtle, semi-transparent watermark across the image.';
+            } else {
+                logoPlacementInstruction = baseLogoInstruction + ` Place this logo in the ${effectiveLogoPos.replace('-', ' ')} corner of the image.`;
+            }
+        } else {
+            // Default for campaign (logoPos is null)
+            logoPlacementInstruction = baseLogoInstruction + ' Place this logo professionally, such as in one of the corners, ensuring it is visible but not obtrusive.';
+        }
+    } else {
+        logoPlacementInstruction = 'Do not include the brand logo in the image.';
+    }
 
     if (imageToIncorporate && !baseAsset) {
       const imageBase64 = await fileToBase64(imageToIncorporate);
@@ -258,23 +260,6 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
 
     const paletteInfo = paletteAsset?.palette ? ` The brand's color palette is named "${paletteAsset.palette.paletteName}" and has a mood of "${paletteAsset.palette.description}". The main colors are ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}. Please use this palette.` : '';
     
-    let logoPlacementInstruction = '';
-    const baseLogoInstruction = `CRITICAL: The first image provided is the brand's logo, which is on a plain solid white background. You MUST remove this white background completely, treating it as transparent. Integrate ONLY the logo's graphic/text seamlessly into your design. DO NOT show the square white background of the logo file.`;
-
-    if (logoPos && logoPos !== 'none') {
-        logoPlacementInstruction = baseLogoInstruction;
-        if (logoPos === 'watermark') {
-            logoPlacementInstruction += ' Place this logo as a subtle, semi-transparent watermark across the image.';
-        } else {
-            logoPlacementInstruction += ` Place this logo in the ${logoPos.replace('-', ' ')} corner of the image.`;
-        }
-    } else if (logoPos === 'none') {
-        logoPlacementInstruction = 'Do not include the brand logo in the image.';
-    } else {
-        logoPlacementInstruction = baseLogoInstruction + ' Place this logo professionally, such as in one of the corners, ensuring it is visible but not obtrusive.';
-    }
-
-
     const imageIncorporateInstruction = imageToIncorporate && !baseAsset ? 'A key part of this request is to use the user-provided image (the one that is not the logo). This image is a product photo or a key brand asset. It MUST be prominently featured as the central element of the final design. The rest of the creative should be built around it.' : '';
     
     const targetWidth = dims ? dims.width : 1080;
@@ -527,57 +512,6 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
   };
 
 
-  const renderImageUpload = (
-    label: string,
-    imageFile: File | null,
-    setImageFile: React.Dispatch<React.SetStateAction<File | null>>,
-    inputRef: React.RefObject<HTMLInputElement>,
-    helpText: string
-  ) => (
-     <div>
-        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{label}</label>
-        {imageFile ? (
-            <div className="relative group">
-                <img src={URL.createObjectURL(imageFile)} alt="Preview" className="w-full h-auto max-h-48 object-contain rounded-md border border-slate-300 dark:border-slate-600 p-1 bg-white dark:bg-slate-700/50" />
-                <button
-                    onClick={() => {
-                        setImageFile(null);
-                        if (inputRef.current) inputRef.current.value = "";
-                    }}
-                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
-                    aria-label="Remove image"
-                >
-                    <XMarkIcon className="w-4 h-4" />
-                </button>
-            </div>
-        ) : (
-            <div
-                onDrop={(e) => handleDrop(e, setImageFile, inputRef)}
-                onDragOver={handleDragOver}
-                onDragLeave={(e) => e.currentTarget.classList.remove('border-indigo-500', 'dark:border-indigo-400')}
-                onDragEnter={(e) => e.currentTarget.classList.add('border-indigo-500', 'dark:border-indigo-400')}
-                className="border border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center cursor-pointer bg-slate-50 dark:bg-slate-900/40 hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors h-full flex flex-col justify-center items-center"
-                onClick={() => inputRef.current?.click()}
-            >
-                <ImageIcon className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">{helpText}</span>
-                    <span className="block text-xs">or drag and drop</span>
-                </p>
-                <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, setImageFile)}
-                    ref={inputRef}
-                    className="hidden"
-                    disabled={isLoading}
-                />
-            </div>
-        )}
-    </div>
-  );
-
-
   return (
     <div>
       {!logoAsset ? (
@@ -644,35 +578,35 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
                       )}
 
                       <div>
-                      <div className="flex justify-between items-center mb-2">
-                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Or write your own prompt</label>
-                          <button 
-                              onClick={() => handleSuggestPrompts('single')} 
-                              disabled={isSuggesting || isLoading}
-                              className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50 disabled:cursor-wait"
-                          >
-                              <LightbulbIcon className="w-4 h-4" />
-                              {isSuggesting ? suggestionLoadingMessage : 'Get Suggestions'}
-                          </button>
-                      </div>
-                      <div className="relative">
-                          <textarea
-                              value={prompt}
-                              onChange={(e) => setPrompt(e.target.value)}
-                              placeholder="e.g., An Instagram post for a new coffee blend called 'Morning Rush'."
-                              className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
-                              rows={3}
-                              disabled={isLoading}
-                          />
-                          <button 
-                              onClick={() => setShowSaveTemplateModal(true)} 
-                              disabled={!prompt.trim() || isLoading}
-                              title="Save as Template"
-                              className="absolute top-2 right-2 p-1.5 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50"
-                          >
-                              <BookmarkIcon className="w-5 h-5"/>
-                          </button>
-                      </div>
+                          <div className="flex justify-between items-center mb-2">
+                              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Creative Prompt</label>
+                              <button 
+                                  onClick={() => handleSuggestPrompts('single')} 
+                                  disabled={isSuggesting || isLoading}
+                                  className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50 disabled:cursor-wait"
+                              >
+                                  <LightbulbIcon className="w-4 h-4" />
+                                  {isSuggesting ? suggestionLoadingMessage : 'Get Suggestions'}
+                              </button>
+                          </div>
+                          <div className="relative">
+                              <textarea
+                                  value={prompt}
+                                  onChange={(e) => setPrompt(e.target.value)}
+                                  placeholder="e.g., An Instagram post for a new coffee blend called 'Morning Rush'."
+                                  className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
+                                  rows={3}
+                                  disabled={isLoading}
+                              />
+                              <button 
+                                  onClick={() => setShowSaveTemplateModal(true)} 
+                                  disabled={!prompt.trim() || isLoading}
+                                  title="Save as Template"
+                                  className="absolute top-2 right-2 p-1.5 rounded-full bg-white/50 dark:bg-slate-800/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50"
+                              >
+                                  <BookmarkIcon className="w-5 h-5"/>
+                              </button>
+                          </div>
                       </div>
                       {suggestions.length > 0 && !isSuggesting && (
                           <div className="space-y-2 animate-fade-in">
@@ -689,27 +623,75 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
                               ))}
                           </div>
                       )}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Creative Type</label>
                             <p className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 text-slate-900 dark:text-slate-100">
                                 Instagram Post (Square)
                             </p>
                           </div>
-                          {renderImageUpload("Upload Product Image (Optional)", productImage, setProductImage, fileInputRef, "Upload a product image")}
+                           <div>
+                              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Brand Logo</label>
+                              <div className="flex items-center justify-between p-2 bg-slate-100 dark:bg-slate-900/30 rounded-md">
+                                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Include Logo</span>
+                                <button
+                                    onClick={() => setAddLogo(!addLogo)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${addLogo ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                    role="switch"
+                                    aria-checked={addLogo}
+                                >
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${addLogo ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                              </div>
+                               <div className={`mt-3 transition-opacity ${!addLogo ? 'opacity-40 pointer-events-none' : ''}`}>
+                                 <div className="flex flex-wrap gap-2">
+                                     {(['top-right', 'top-left', 'bottom-right', 'bottom-left', 'watermark', 'none'] as LogoPosition[]).map(pos => (
+                                         <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
+                                             {pos.replace('-', ' ')}
+                                         </button>
+                                     ))}
+                                 </div>
+                              </div>
+                          </div>
                       </div>
 
                       <div>
-                          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Logo Position</label>
-                          <div className="flex flex-wrap gap-2">
-                              {(['top-right', 'top-left', 'bottom-right', 'bottom-left', 'watermark', 'none'] as LogoPosition[]).map(pos => (
-                                  <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
-                                      {pos.replace('-', ' ')}
-                                  </button>
-                              ))}
-                          </div>
-                      </div>
-                      <div className="!mt-6 flex justify-center">
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Upload Product Image (Optional)</label>
+                            {productImage ? (
+                                <div className="relative group">
+                                    <img src={URL.createObjectURL(productImage)} alt="Preview" className="w-full h-auto max-h-48 object-contain rounded-md border border-slate-300 dark:border-slate-600 p-1 bg-white dark:bg-slate-700/50" />
+                                    <button
+                                        onClick={() => {
+                                            setProductImage(null);
+                                            if (fileInputRef.current) fileInputRef.current.value = "";
+                                        }}
+                                        className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
+                                        aria-label="Remove image"
+                                    >
+                                        <XMarkIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="flex w-auto items-center justify-start gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                                >
+                                    <ImageIcon className="w-5 h-5" />
+                                    Upload Image
+                                </button>
+                            )}
+                             <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleFileChange(e, setProductImage)}
+                                ref={fileInputRef}
+                                className="hidden"
+                                disabled={isLoading}
+                            />
+                        </div>
+                      
+                      <div className="!mt-8 flex justify-center">
                           <button
                               onClick={() => handleGenerate()}
                               disabled={isLoading || !prompt.trim()}
@@ -761,7 +743,35 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
                               ))}
                           </div>
                       )}
-                      {renderImageUpload("Campaign Image (Optional)", campaignImage, setCampaignImage, campaignFileInputRef, "Upload a key campaign image")}
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Campaign Image (Optional)</label>
+                        {campaignImage ? (
+                            <div className="flex items-center gap-3 p-2 bg-slate-200 dark:bg-slate-700 rounded-md">
+                                <img src={URL.createObjectURL(campaignImage)} alt="Campaign Preview" className="w-12 h-12 object-contain rounded-md bg-white dark:bg-slate-600" />
+                                <span className="text-sm text-slate-700 dark:text-slate-200 truncate flex-1">{campaignImage.name}</span>
+                                <button
+                                    onClick={() => {
+                                        setCampaignImage(null);
+                                        if (campaignFileInputRef.current) campaignFileInputRef.current.value = "";
+                                    }}
+                                    className="p-1.5 rounded-full hover:bg-slate-300 dark:hover:bg-slate-600"
+                                    aria-label="Remove image"
+                                >
+                                    <XMarkIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                             <button
+                                onClick={() => campaignFileInputRef.current?.click()}
+                                className="flex w-auto items-center justify-start gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                <ImageIcon className="w-5 h-5" />
+                                Upload Image
+                            </button>
+                        )}
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setCampaignImage)} ref={campaignFileInputRef} className="hidden" disabled={isLoading} />
+                      </div>
+
 
                       <div>
                           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Select Creatives to Generate</label>
@@ -841,8 +851,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
                     >
                         <AsyncImage assetId={original.id} alt="Generated creative" className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300"/>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                          <p className="text-sm font-semibold text-slate-100 drop-shadow-lg truncate">{original.prompt}</p>
-                          <p className="text-xs text-slate-300 capitalize">{original.type.replace('_', ' ')}</p>
+                          <p className="text-sm font-semibold text-slate-100 drop-shadow-lg capitalize">{original.type.replace('_', ' ')}</p>
                           <div className="flex flex-wrap gap-1.5 mt-2">
                                 {original.tags?.map(tag => (
                                   <span key={tag} className="text-xs bg-slate-50/20 text-white px-2 py-0.5 rounded-full backdrop-blur-sm">{tag}</span>

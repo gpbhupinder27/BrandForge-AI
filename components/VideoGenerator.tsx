@@ -122,7 +122,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 const logoFile = new File([logoBlob], "logo.png", { type: logoBlob.type });
                 const logoBase64 = await fileToBase64(logoFile);
                 imageInputs.push({ data: logoBase64, mimeType: logoFile.type });
-                logoInstruction = `CRITICAL: The first image provided is the brand's logo, which is on a plain solid white background. You MUST remove this white background completely, treating it as transparent. Integrate ONLY the logo's graphic/text seamlessly into your design in a professional and unobtrusive way, like the bottom-right corner. DO NOT show the square white background of the logo file.`;
+                logoInstruction = `CRITICAL: The first image provided is the brand's logo, which is on a plain solid white background. You MUST remove this white background completely, treating it as transparent. Integrate ONLY the logo's graphic/text seamlessly into your design in a professional and unobtrusive way, like the bottom-right corner. The logo should be small, occupying no more than 10% of the image width. DO NOT show the square white background of the logo file.`;
             }
 
 
@@ -301,8 +301,13 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                         
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Options</label>
-                            <div className="flex flex-wrap items-center justify-between gap-4">
-                                {/* Logo Toggle */}
+                            <div className="flex items-center justify-between gap-4">
+                                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                                    <ImageIcon className="w-5 h-5" />
+                                    Upload Image
+                                </button>
+                                <input type="file" accept="image/*" onChange={e => e.target.files && setReferenceImageFile(e.target.files[0])} ref={fileInputRef} className="hidden" disabled={isLoadingImage} />
+                                
                                 <div className="flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-900/30 rounded-md">
                                     <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Add Brand Logo</span>
                                     <button
@@ -313,19 +318,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                                     >
                                         <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${addLogo ? 'translate-x-5' : 'translate-x-0'}`} />
                                     </button>
-                                </div>
-                        
-                                {/* Action Buttons */}
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => fileInputRef.current?.click()} className="h-10 flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
-                                        <ImageIcon className="w-5 h-5" />
-                                        Upload Image
-                                    </button>
-                                    <input type="file" accept="image/*" onChange={e => e.target.files && setReferenceImageFile(e.target.files[0])} ref={fileInputRef} className="hidden" disabled={isLoadingImage} />
-                                    <button onClick={() => handleGenerateImage(false)} disabled={isLoadingImage || !imagePrompt.trim()} className="h-10 flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50">
-                                       <SparklesIcon className="w-5 h-5" />
-                                       {isLoadingImage ? '...' : 'Generate'}
-                                   </button>
                                 </div>
                             </div>
                         </div>
@@ -339,6 +331,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                                 </button>
                             </div>
                         )}
+                        <div className="mt-6 flex justify-center">
+                            <button onClick={() => handleGenerateImage(false)} disabled={isLoadingImage || !imagePrompt.trim()} className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-2.5 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50">
+                               <SparklesIcon className="w-5 h-5" />
+                               {isLoadingImage ? 'Generating...' : 'Generate Image'}
+                           </button>
+                        </div>
                    </div>
 
                    {activeImage && (

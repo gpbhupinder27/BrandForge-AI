@@ -161,6 +161,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     const [style, setStyle] = useState('Default');
     const [composition, setComposition] = useState('Default');
     const [emotion, setEmotion] = useState('None');
+    const [addLogo, setAddLogo] = useState(true);
     const [logoPosition, setLogoPosition] = useState<LogoPosition>('top-right');
     const [baseImageFile, setBaseImageFile] = useState<File | null>(null);
 
@@ -318,7 +319,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
             setError("Please provide a base image prompt or upload an image.");
             return;
         }
-        if (!logoAsset) {
+        if (addLogo && !logoAsset) {
              setError("Please generate a logo in the Identity Studio first.");
             return;
         }
@@ -329,13 +330,15 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
         try {
             let imageInputs = [];
             
-            const logoImageUrl = await getImage(logoAsset.id);
-            if (!logoImageUrl) throw new Error("Logo image not found in database.");
-            const logoResponse = await fetch(logoImageUrl);
-            const logoBlob = await logoResponse.blob();
-            const logoFile = new File([logoBlob], "logo.png", { type: logoBlob.type });
-            const logoBase64 = await fileToBase64(logoFile);
-            imageInputs.push({ data: logoBase64, mimeType: logoFile.type });
+            if(addLogo && logoAsset) {
+                const logoImageUrl = await getImage(logoAsset.id);
+                if (!logoImageUrl) throw new Error("Logo image not found in database.");
+                const logoResponse = await fetch(logoImageUrl);
+                const logoBlob = await logoResponse.blob();
+                const logoFile = new File([logoBlob], "logo.png", { type: logoBlob.type });
+                const logoBase64 = await fileToBase64(logoFile);
+                imageInputs.push({ data: logoBase64, mimeType: logoFile.type });
+            }
 
             if (baseImageFile) {
                 const base64 = await fileToBase64(baseImageFile);
@@ -343,8 +346,8 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
             }
             
             let logoInstruction = 'Do not include the brand logo.';
-            if (logoPosition !== 'none') {
-                logoInstruction = `The first image provided is the brand logo. It is on a plain white background; you MUST treat this background as transparent and integrate ONLY the logo itself seamlessly onto the thumbnail. Do not include the white box from the logo's background. Place this logo in a ${logoPosition === 'watermark' ? 'subtle watermark style' : `clear and visible manner in the ${logoPosition.replace('-', ' ')} corner`}.`;
+            if (addLogo && logoPosition !== 'none') {
+                logoInstruction = `The first image provided is the brand logo. It is on a plain white background; you MUST treat this background as transparent and integrate ONLY the logo itself seamlessly onto the thumbnail. The logo should be small, occupying no more than 15% of the thumbnail's width. Do not include the white box from the logo's background. Place this logo in a ${logoPosition === 'watermark' ? 'subtle watermark style' : `clear and visible manner in the ${logoPosition.replace('-', ' ')} corner`}.`;
             }
 
             let promptParts = [
@@ -387,6 +390,8 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                         prompt: finalPrompt,
                         createdAt: new Date().toISOString(),
                         tags: tags,
+                        width: 1280,
+                        height: 720,
                     });
                 }
             }
@@ -485,6 +490,8 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                         prompt: combinedEditPrompt,
                         createdAt: new Date().toISOString(),
                         tags: editingAsset.tags || [],
+                        width: 1280,
+                        height: 720,
                     };
                     newAssets.push(newAsset);
 
@@ -574,22 +581,27 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                             ))}
                         </div>
                     )}
-                     <p className="text-center text-xs font-semibold text-slate-400 dark:text-slate-500 my-3">OR</p>
-                     {baseImageFile ? (
-                         <div className="relative group">
-                             <img src={URL.createObjectURL(baseImageFile)} alt="Preview" className="w-full h-auto max-h-40 object-contain rounded-md border border-slate-300 dark:border-slate-600 p-1" />
-                             <button onClick={() => { setBaseImageFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80"><XMarkIcon className="w-4 h-4" /></button>
-                         </div>
-                     ) : (
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
-                        >
-                             <ImageIcon className="w-5 h-5" />
-                             Upload an Image
-                        </button>
-                     )}
-                     <input type="file" accept="image/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" disabled={isLoading} />
+                     <div className="mt-4">
+                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Reference Image (optional)</label>
+                         {baseImageFile ? (
+                             <div className="flex items-center gap-3 p-2 bg-slate-200 dark:bg-slate-700 rounded-md">
+                                 <img src={URL.createObjectURL(baseImageFile)} alt="Reference Preview" className="w-12 h-12 object-contain rounded-md bg-white dark:bg-slate-600" />
+                                 <span className="text-sm text-slate-700 dark:text-slate-200 truncate flex-1">{baseImageFile.name}</span>
+                                 <button onClick={() => { setBaseImageFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="p-1.5 rounded-full hover:bg-slate-300 dark:hover:bg-slate-600" aria-label="Remove image">
+                                     <XMarkIcon className="w-4 h-4" />
+                                 </button>
+                             </div>
+                         ) : (
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex w-auto items-center justify-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                            >
+                                 <ImageIcon className="w-5 h-5" />
+                                 Upload Image
+                            </button>
+                         )}
+                         <input type="file" accept="image/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" disabled={isLoading} />
+                     </div>
                 </div>
                 
                 <div>
@@ -650,7 +662,18 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 
                 <div>
                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">6. Branding</label>
-                     <div className="flex flex-wrap gap-2">
+                     <div className="flex items-center gap-4 mb-2">
+                        <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Add Logo</span>
+                        <button
+                            onClick={() => setAddLogo(!addLogo)}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${addLogo ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                            role="switch"
+                            aria-checked={addLogo}
+                        >
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${addLogo ? 'translate-x-5' : 'translate-x-0'}`} />
+                        </button>
+                     </div>
+                     <div className={`flex flex-wrap gap-2 transition-opacity ${!addLogo ? 'opacity-40 pointer-events-none' : ''}`}>
                         {(['top-right', 'top-left', 'bottom-left', 'bottom-right', 'watermark', 'none'] as LogoPosition[]).map(pos => (
                             <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
                                 {pos.replace('-', ' ')}
@@ -680,11 +703,13 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                  ) : (
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {thumbnailAssets.map(asset => (
-                            <div key={asset.id} onClick={() => setPreviewingAsset(asset)} className="group relative aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700/50 cursor-pointer">
-                                <AsyncImage assetId={asset.id} alt={asset.prompt} className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
+                            <div key={asset.id} onClick={() => setPreviewingAsset(asset)}
+                                 className="group relative rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700/50 cursor-pointer"
+                                 style={{ aspectRatio: asset.width && asset.height ? `${asset.width} / ${asset.height}` : '16 / 9' }}>
+                                <AsyncImage assetId={asset.id} alt={asset.prompt} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
                                 <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                                    <p className="text-xs font-semibold text-shadow-lg truncate">{asset.prompt}</p>
+                                    <p className="text-xs font-semibold text-shadow-lg capitalize">{asset.type.replace('_', ' ')}</p>
                                 </div>
                             </div>
                         ))}
