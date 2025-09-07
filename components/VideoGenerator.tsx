@@ -64,7 +64,23 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
 
             const finalPrompt = `Create a visually stunning image for a video ad. User request: "${promptToUse}".${paletteInfo}`;
             
-            const generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs);
+            let width = 1024;
+            let height = 576; // Default 16:9
+            switch (aspectRatio) {
+                case '1:1':
+                    width = 1024; height = 1024; break;
+                case '9:16':
+                    width = 576; height = 1024; break;
+                case '4:3':
+                    width = 1024; height = 768; break;
+                case '3:4':
+                    width = 768; height = 1024; break;
+                case '16:9':
+                default:
+                    width = 1024; height = 576; break;
+            }
+
+            const generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, width, height);
             const imagePart = generatedParts.find(p => 'inlineData' in p);
 
             if (imagePart && 'inlineData' in imagePart) {

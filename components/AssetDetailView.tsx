@@ -128,6 +128,15 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
     const runGenerationForAsset = async (baseAsset: BrandAsset, generationPrompt: string, isVariant: boolean) => {
         setError(null);
 
+        const getDimensions = (url: string): Promise<{ width: number, height: number }> => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve({ width: img.width, height: img.height });
+                img.onerror = () => resolve({ width: 1024, height: 1024 }); // Fallback
+                img.src = url;
+            });
+        };
+
         const logoAsset = brand.assets.find(a => a.type === 'logo');
         if (!logoAsset) throw new Error("A brand logo is required for this action.");
 
@@ -161,12 +170,13 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                 fullPrompt = `Create exactly 2 A/B test variations for the provided marketing creative. The original goal was: "${baseAsset.prompt}". Generate two distinct versions that target different marketing angles. For example, one variant could have a stronger call-to-action focused on a limited-time sale (e.g., "50% Off Today!"), while the other could focus on a product feature or building brand engagement (e.g., "Experience the new..."). The variations should explore different headlines, secondary text, or color schemes to achieve these different goals. Do not change the brand logo's placement or design.`;
             }
         } else {
-             const paletteAsset = brand.assets.find(a => a.type === 'palette');
-             const paletteInfo = paletteAsset?.palette ? ` The brand's color palette is: ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}.` : '';
-            fullPrompt = `Edit the provided image based on this request: "${generationPrompt}". The original prompt was "${baseAsset.prompt}". The image is for a brand named "${brand.name}". ${paletteInfo} Ensure the brand logo remains clearly visible.`;
+            const paletteAsset = brand.assets.find(a => a.type === 'palette');
+            const paletteInfo = paletteAsset?.palette ? ` The brand's color palette is: ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}.` : '';
+            fullPrompt = `Update the input image based on this request: "${generationPrompt}". Do not change the input aspect ratio. The original prompt was "${baseAsset.prompt}". The image is for a brand named "${brand.name}". ${paletteInfo} Ensure the brand logo remains clearly visible.`;
         }
-
-        const generatedParts = await generateWithNanoBanana(fullPrompt, imageInputs);
+        
+        const { width, height } = await getDimensions(baseImageUrl);
+        const generatedParts = await generateWithNanoBanana(fullPrompt, imageInputs, width, height);
         const newAssets: BrandAsset[] = [];
         
         for (const [index, part] of generatedParts.filter(p => 'inlineData' in p).entries()) {
@@ -240,13 +250,13 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                 <div className="space-y-8 p-8 bg-white dark:bg-slate-800 rounded-lg w-full max-w-2xl">
                     <div>
                         <p className="text-base text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Headline</p>
-                        <p className="text-6xl font-bold text-slate-900 dark:text-slate-50 mt-1 break-words" style={{fontFamily: `'${asset.typography.headlineFont.name}', 'Manrope', sans-serif`}}>{asset.typography.headlineFont.name}</p>
-                        <p className="text-sm text-slate-500 italic mt-2">{asset.typography.headlineFont.description}</p>
+                        <p className="text-6xl font-bold text-slate-900 dark:text-slate-50 mt-1 break-words" style={{fontFamily: asset.typography.headlineFont?.name ? `'${asset.typography.headlineFont.name}', 'Manrope', sans-serif` : "'Manrope', sans-serif"}}>{asset.typography.headlineFont?.name || 'Not set'}</p>
+                        <p className="text-sm text-slate-500 italic mt-2">{asset.typography.headlineFont?.description}</p>
                     </div>
                      <div>
                         <p className="text-base text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Body</p>
-                        <p className="text-xl text-slate-800 dark:text-slate-200 mt-1" style={{fontFamily: `'${asset.typography.bodyFont.name}', 'Manrope', sans-serif`}}>The quick brown fox jumps over the lazy dog. A sentence to demonstrate the body font style.</p>
-                        <p className="text-sm text-slate-500 italic mt-2">{asset.typography.bodyFont.description}</p>
+                        <p className="text-xl text-slate-800 dark:text-slate-200 mt-1" style={{fontFamily: asset.typography.bodyFont?.name ? `'${asset.typography.bodyFont.name}', 'Manrope', sans-serif` : "'Manrope', sans-serif"}}>The quick brown fox jumps over the lazy dog. A sentence to demonstrate the body font style.</p>
+                        <p className="text-sm text-slate-500 italic mt-2">{asset.typography.bodyFont?.description}</p>
                     </div>
                 </div>
             )

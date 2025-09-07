@@ -50,7 +50,7 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
   const [isExporting, setIsExporting] = useState(false);
   const [viewingAssetId, setViewingAssetId] = useState<string | null>(null);
 
-  const logoAsset = brand.assets.find(asset => asset.type === 'logo');
+  const logoAsset = brand.assets.find(asset => asset.type === 'logo' && asset.isPrimary) || brand.assets.find(asset => asset.type === 'logo');
   const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
   const typographyAsset = brand.assets.find(asset => asset.type === 'typography');
 
@@ -63,8 +63,8 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
 
    useEffect(() => {
     if (typographyAsset?.typography) {
-        const headlineFontName = typographyAsset.typography.headlineFont.name;
-        const bodyFontName = typographyAsset.typography.bodyFont.name;
+        const headlineFontName = typographyAsset.typography.headlineFont?.name;
+        const bodyFontName = typographyAsset.typography.bodyFont?.name;
 
         if (headlineFontName && bodyFontName) {
             const fontFamilies = [headlineFontName, bodyFontName]
@@ -96,30 +96,31 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
     try {
         // Step 1: Generate Palette
         const palettePrompt = `Generate a color palette for a brand named "${brand.name}" which is described as "${brand.description}".`;
-        const paletteSchema = { type: Type.OBJECT, properties: { paletteName: { type: Type.STRING }, description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { hex: { type: Type.STRING }, name: { type: Type.STRING } } } } } };
+        const paletteSchema = { type: Type.OBJECT, properties: { paletteName: { type: Type.STRING }, description: { type: Type.STRING }, colors: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { hex: { type: Type.STRING }, name: { type: Type.STRING } }, required: ["hex", "name"] } } }, required: ["paletteName", "description", "colors"] };
         const paletteResult = await generateStructuredContent<ColorPalette>(palettePrompt, paletteSchema);
         const paletteAsset: BrandAsset = { id: crypto.randomUUID(), type: 'palette', prompt: palettePrompt, palette: paletteResult, createdAt: new Date().toISOString() };
 
         // Step 2: Generate Typography using Palette info
         const typographyPrompt = `Generate a professional typography pairing (headline and body) for a brand named "${brand.name}". The brand's color palette is described as "${paletteResult.description}". Provide well-known Google Fonts or standard web fonts that match this style.`;
-        const fontSchema = { type: Type.OBJECT, properties: { name: { type: Type.STRING }, description: { type: Type.STRING } } };
-        const typographySchema = { type: Type.OBJECT, properties: { headlineFont: fontSchema, bodyFont: fontSchema } };
+        const fontSchema = { type: Type.OBJECT, properties: { name: { type: Type.STRING }, description: { type: Type.STRING } }, required: ["name", "description"] };
+        const typographySchema = { type: Type.OBJECT, properties: { headlineFont: fontSchema, bodyFont: fontSchema }, required: ["headlineFont", "bodyFont"] };
         const typographyResult = await generateStructuredContent<TypographyPairing>(typographyPrompt, typographySchema);
         const typographyAsset: BrandAsset = { id: crypto.randomUUID(), type: 'typography', prompt: typographyPrompt, typography: typographyResult, createdAt: new Date().toISOString() };
         
         // Step 3: Generate Logo using Palette and Typography info
-        const logoPrompt = `A modern, minimalist logo for a brand called '${brand.name}' which is described as "${brand.description}". Use a color palette inspired by these hex codes: ${paletteResult.colors.map(c => c.hex).join(', ')}. The brand's typography feels like: "${typographyResult.headlineFont.description}".`;
+        const logoPrompt = `A modern, minimalist logo for a brand called '${brand.name}' which is described as "${brand.description}". The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements. Use a color palette inspired by these hex codes: ${paletteResult.colors.map(c => c.hex).join(', ')}. The brand's typography feels like: "${typographyResult.headlineFont.description}".`;
         const logoParts = await generateWithNanoBanana(logoPrompt, [], 1024, 1024); // Generate a square logo
         
         const logoAssets: BrandAsset[] = [];
 
-        for (const part of logoParts) {
+        for (const [index, part] of logoParts.filter(p => 'inlineData' in p).entries()) {
             if ('inlineData' in part) {
                 const asset = {
                     id: crypto.randomUUID(),
                     type: 'logo' as AssetType,
                     prompt: logoPrompt,
                     createdAt: new Date().toISOString(),
+                    isPrimary: index === 0, // Set the first generated logo as primary by default
                 };
                 const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                 await storeImage(asset.id, imageUrl); // Store image in IndexedDB
@@ -243,10 +244,14 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
                         onClick={() => setActiveTab('identity')}
                         title="Go to Identity Studio"
                     >
-                      {logoAsset && (
+                      {logoAsset ? (
                         <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shadow-lg flex-shrink-0">
                           <AsyncImage assetId={logoAsset.id} alt="Brand Logo" className="w-full h-full object-contain" />
                         </div>
+                      ) : (
+                         <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shadow-lg flex-shrink-0 flex items-center justify-center">
+                            <RectangleStackIcon className="w-10 h-10 text-slate-400 dark:text-slate-500"/>
+                         </div>
                       )}
                       <div className="flex-1">
                         <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{brand.name}</h2>
@@ -289,17 +294,17 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
                           <div className="space-y-1">
                               <p 
                                   className="text-xl font-bold text-slate-800 dark:text-slate-200 truncate" 
-                                  title={typographyAsset.typography.headlineFont.name}
-                                  style={{ fontFamily: `'${typographyAsset.typography.headlineFont.name}', sans-serif` }}
+                                  title={typographyAsset.typography.headlineFont?.name}
+                                  style={{ fontFamily: typographyAsset.typography.headlineFont?.name ? `'${typographyAsset.typography.headlineFont.name}', sans-serif` : 'sans-serif' }}
                               >
-                                  {typographyAsset.typography.headlineFont.name}
+                                  {typographyAsset.typography.headlineFont?.name || 'Headline'}
                               </p>
                               <p 
                                   className="text-sm text-slate-600 dark:text-slate-400 truncate" 
-                                  title={typographyAsset.typography.bodyFont.name}
-                                  style={{ fontFamily: `'${typographyAsset.typography.bodyFont.name}', sans-serif` }}
+                                  title={typographyAsset.typography.bodyFont?.name}
+                                  style={{ fontFamily: typographyAsset.typography.bodyFont?.name ? `'${typographyAsset.typography.bodyFont.name}', sans-serif` : 'sans-serif' }}
                               >
-                                  {typographyAsset.typography.bodyFont.name}
+                                  {typographyAsset.typography.bodyFont?.name || 'Body'}
                               </p>
                           </div>
                         </div>
@@ -307,38 +312,38 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
                     )}
                 </div>
                  <div className="border-b border-slate-200 dark:border-slate-700 mb-8">
-                    <nav className="-mb-px flex space-x-2">
+                    <nav className="-mb-px flex">
                     <button
                         onClick={() => setActiveTab('identity')}
-                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'identity' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
+                        className={`mr-2 py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'identity' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
                         <IdentificationIcon className="w-5 h-5" />
                         Identity Studio
                     </button>
                     <button
                         onClick={() => setActiveTab('creatives')}
-                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'creatives' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
+                        className={`mr-2 py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'creatives' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
                         <SparklesIcon className="w-5 h-5" />
                         Creative Lab
                     </button>
                      <button
                         onClick={() => setActiveTab('thumbnails')}
-                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'thumbnails' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
+                        className={`mr-2 py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'thumbnails' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
                         <ImageIcon className="w-5 h-5" />
                         Thumbnail Studio
                     </button>
                      <button
                         onClick={() => setActiveTab('video_ads')}
-                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'video_ads' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
+                        className={`mr-2 py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'video_ads' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
                         <VideoIcon className="w-5 h-5" />
                         Video Ad Studio
                     </button>
                     <button
                         onClick={() => setActiveTab('library')}
-                        className={`py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'library' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
+                        className={`ml-auto py-3 px-4 font-semibold rounded-t-md transition-colors border-b-2 flex items-center gap-2 ${activeTab === 'library' ? 'text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-800/50 border-indigo-500 dark:border-indigo-400' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600'}`}
                     >
                         <RectangleStackIcon className="w-5 h-5" />
                         Asset Library

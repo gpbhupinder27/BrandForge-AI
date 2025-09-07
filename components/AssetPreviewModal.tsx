@@ -5,6 +5,7 @@ import EditIcon from './icons/EditIcon';
 import DownloadIcon from './icons/DownloadIcon';
 import XMarkIcon from './icons/XMarkIcon';
 import BeakerIcon from './icons/BeakerIcon';
+import IdentificationIcon from './icons/IdentificationIcon';
 
 interface AssetPreviewModalProps {
   asset: BrandAsset;
@@ -13,10 +14,11 @@ interface AssetPreviewModalProps {
   onDownload?: (assetId: string, assetType: string) => void;
   onUpdateTags: (assetId: string, newTags: string[]) => void;
   onGenerateVariants?: (asset: BrandAsset) => void;
+  onSetPrimary?: (assetId: string) => void;
   availableTags?: string[];
 }
 
-const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, onEdit, onDownload, onUpdateTags, onGenerateVariants, availableTags }) => {
+const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, onEdit, onDownload, onUpdateTags, onGenerateVariants, onSetPrimary, availableTags }) => {
   const [tagInput, setTagInput] = useState('');
 
   useEffect(() => {
@@ -153,6 +155,16 @@ const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, o
             </div>
 
             <div className="mt-auto pt-6 flex flex-col gap-3">
+                {asset.type === 'logo' && onSetPrimary && (
+                    <button 
+                        onClick={() => onSetPrimary(asset.id)} 
+                        disabled={asset.isPrimary}
+                        className="w-full text-sm flex items-center justify-center gap-2 bg-slate-600 text-white px-4 py-2 rounded-md hover:bg-slate-500 transition-colors disabled:bg-indigo-600 disabled:cursor-not-allowed"
+                    >
+                        <IdentificationIcon className="w-4 h-4"/>
+                        {asset.isPrimary ? 'Primary Logo' : 'Set as Primary'}
+                    </button>
+                )}
                 {isVariantGeneratable && onGenerateVariants && (
                   <button onClick={() => onGenerateVariants(asset)} className="w-full text-sm flex items-center justify-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-500 transition-colors">
                       <BeakerIcon className="w-4 h-4" /> Generate A/B Variants

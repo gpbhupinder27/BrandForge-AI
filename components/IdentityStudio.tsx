@@ -191,7 +191,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; }[]>([]);
+  const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; overlayText?: string; }[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestionLoadingMessage, setSuggestionLoadingMessage] = useState('Thinking...');
   const [isLogoTemplateModalOpen, setIsLogoTemplateModalOpen] = useState(false);
@@ -267,6 +267,16 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
     );
     onUpdateBrand({ ...brand, assets: updatedAssets });
   };
+  
+   const handleSetPrimaryLogo = (logoId: string) => {
+        const updatedAssets = brand.assets.map(asset => {
+            if (asset.type === 'logo') {
+                return { ...asset, isPrimary: asset.id === logoId };
+            }
+            return asset;
+        });
+        onUpdateBrand({ ...brand, assets: updatedAssets });
+    };
 
   const handleDownload = async (assetId: string, assetType: string) => {
     const imageUrl = await getImage(assetId);
@@ -404,18 +414,21 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
       const paletteInfo = paletteAsset?.palette ? ` Use a color palette inspired by these hex codes: ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}.` : '';
       const typoInfo = typographyAsset?.typography ? ` The brand's typography feels like: "${typographyAsset.typography.headlineFont.description}".` : '';
       const referenceInfo = !baseAsset && referenceImage ? ` The user has provided a reference image; use it as strong visual inspiration for the logo's style, shape, and overall concept.` : '';
-      const finalPrompt = `Create a logo for a brand named "${brand.name}". The user's request is: "${currentPrompt}".${paletteInfo}${typoInfo}${referenceInfo}`;
+      const finalPrompt = `Create a logo for a brand named "${brand.name}". User request: "${currentPrompt}".${paletteInfo}${typoInfo}${referenceInfo} The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements.`;
 
       const generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, 1024, 1024);
       
       const newAssets: BrandAsset[] = [];
-      for (const part of generatedParts) {
+      const existingLogos = brand.assets.filter(a => a.type === 'logo');
+
+      for (const [index, part] of generatedParts.filter(p => 'inlineData' in p).entries()) {
         if ('inlineData' in part) {
           const asset: BrandAsset = {
             id: crypto.randomUUID(),
             type: 'logo',
             prompt: currentPrompt,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            isPrimary: existingLogos.length === 0 && index === 0, // Make first logo primary if none exist
           };
           const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           await storeImage(asset.id, imageUrl);
@@ -455,7 +468,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
         const base64 = await fileToBase64(file);
         const imageInputs = [{ data: base64, mimeType: file.type }];
 
-        const variantPrompt = `Create exactly 2 A/B test variations for the provided logo. The original prompt was: "${baseAsset.prompt}". Generate two distinct versions that target different potential audiences. For example, one could be more playful and modern for a younger audience, while the other could be more elegant and professional for a corporate audience. The variations should explore different styles (e.g., color, typography, shape) but keep the brand name '${brand.name}' clear.`;
+        const variantPrompt = `Create exactly 2 A/B test variations for the provided logo. The original prompt was: "${baseAsset.prompt}". Generate two distinct versions that target different potential audiences. For example, one could be more playful and modern for a younger audience, while the other could be more elegant and professional for a corporate audience. The variations should explore different styles (e.g., color, typography, shape) but keep the brand name '${brand.name}' clear. Each variation MUST have a transparent background.`;
         
         const generatedParts = await generateWithNanoBanana(variantPrompt, imageInputs, 1024, 1024);
         
@@ -573,13 +586,13 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                     <div className="space-y-6 bg-slate-100 dark:bg-slate-700/30 p-4 rounded-md">
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Headline</p>
-                            <p className="text-4xl font-bold text-slate-900 dark:text-slate-50" style={{fontFamily: typographyAsset.typography.headlineFont.name}}>{typographyAsset.typography.headlineFont.name}</p>
-                            <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.headlineFont.description}</p>
+                            <p className="text-4xl font-bold text-slate-900 dark:text-slate-50" style={{fontFamily: typographyAsset.typography.headlineFont?.name ? `'${typographyAsset.typography.headlineFont.name}'` : 'sans-serif'}}>{typographyAsset.typography.headlineFont?.name || 'Not set'}</p>
+                            <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.headlineFont?.description}</p>
                         </div>
                         <div>
                             <p className="text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Body</p>
-                            <p className="text-lg text-slate-800 dark:text-slate-200" style={{fontFamily: typographyAsset.typography.bodyFont.name}}>The quick brown fox jumps over the lazy dog. {typographyAsset.typography.bodyFont.name}</p>
-                            <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.bodyFont.description}</p>
+                            <p className="text-lg text-slate-800 dark:text-slate-200" style={{fontFamily: typographyAsset.typography.bodyFont?.name ? `'${typographyAsset.typography.bodyFont.name}'` : 'sans-serif'}}>The quick brown fox jumps over the lazy dog. {typographyAsset.typography.bodyFont?.name || 'Not set'}</p>
+                            <p className="text-xs text-slate-500 italic mt-1">{typographyAsset.typography.bodyFont?.description}</p>
                         </div>
                     </div>
                 ) : <p className="text-slate-500 italic">No typography pairing generated yet.</p>}
@@ -635,13 +648,13 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                     <div className="bg-slate-50 dark:bg-slate-900/40 p-6 rounded-lg border border-slate-200 dark:border-slate-700/50">
                         <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Logo Creation Zone</h3>
                         <div className="flex flex-col gap-6">
-                            {/* 1. Browse Templates */}
+                             {/* 1. Browse Templates */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Start with a template</label>
                                 <button
                                     onClick={() => setIsLogoTemplateModalOpen(true)}
                                     disabled={isLoading}
-                                    className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 font-semibold bg-white dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm"
+                                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 font-semibold bg-white dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm"
                                 >
                                     <TemplateIcon className="w-5 h-5" /> Browse templates
                                 </button>
@@ -686,7 +699,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                                 )}
                             </div>
 
-                            {/* 3. Upload Image */}
+                             {/* 3. Upload Image */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Reference Image (optional)</label>
                                 {!referenceImage ? (
@@ -770,34 +783,47 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                             </div>
                             ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredAssetGroups.map(({ original, variants }) => (
-                                <div key={original.id} className="p-4 border border-slate-200 dark:border-slate-700/50 rounded-lg bg-white dark:bg-slate-800/20">
-                                    <div className="group relative cursor-pointer aspect-square rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50" onClick={() => setPreviewingAsset(original)}>
-                                        <AsyncImage assetId={original.id} alt="Generated logo" className="w-full h-full object-contain p-2"/>
-                                        <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 text-left">
-                                        <p className="text-xs text-slate-300 max-h-12 overflow-hidden">{original.prompt}</p>
-                                        <div className="flex flex-wrap gap-1 mt-1.5">
-                                            {original.tags?.map(tag => (
-                                            <span key={tag} className="text-xs bg-indigo-500/80 text-white px-1.5 py-0.5 rounded-full">{tag}</span>
-                                            ))}
-                                        </div>
-                                        </div>
-                                    </div>
-                                    {variants.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                                            <h5 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-2"><BeakerIcon className="w-4 h-4"/> A/B Test Variants</h5>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                {variants.map(variant => (
-                                                    <div key={variant.id} className="group relative rounded-lg bg-slate-100 dark:bg-slate-800/60 overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer aspect-square flex justify-center items-center" onClick={() => setPreviewingAsset(variant)}>
-                                                        <span className="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full z-10 font-semibold">{variant.variantLabel}</span>
-                                                        <AsyncImage assetId={variant.id} alt={`Variant logo: ${variant.prompt}`} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"/>
-                                                    </div>
-                                                ))}
+                                {filteredAssetGroups.map(({ original, variants }) => {
+                                    const isPrimary = original.isPrimary;
+                                    return (
+                                        <div key={original.id} className={`p-4 border rounded-lg bg-white dark:bg-slate-800/20 transition-all ${isPrimary ? 'border-indigo-500 shadow-lg' : 'border-slate-200 dark:border-slate-700/50'}`}>
+                                            {isPrimary && (
+                                                <div className="absolute top-2 right-2 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded-full z-10">Primary</div>
+                                            )}
+                                            <div className="group relative cursor-pointer aspect-square rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50" onClick={() => setPreviewingAsset(original)}>
+                                                <AsyncImage assetId={original.id} alt="Generated logo" className="w-full h-full object-contain p-2"/>
+                                                <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 text-left">
+                                                <p className="text-xs text-slate-300 max-h-12 overflow-hidden">{original.prompt}</p>
+                                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                                    {original.tags?.map(tag => (
+                                                    <span key={tag} className="text-xs bg-indigo-500/80 text-white px-1.5 py-0.5 rounded-full">{tag}</span>
+                                                    ))}
+                                                </div>
+                                                </div>
                                             </div>
+                                            <div className="mt-2">
+                                                {!isPrimary && (
+                                                    <button onClick={() => handleSetPrimaryLogo(original.id)} className="w-full text-center text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-100/50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 py-1.5 rounded-md transition-colors">
+                                                        Set as Primary
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {variants.length > 0 && (
+                                                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                    <h5 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-2"><BeakerIcon className="w-4 h-4"/> A/B Test Variants</h5>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {variants.map(variant => (
+                                                            <div key={variant.id} className="group relative rounded-lg bg-slate-100 dark:bg-slate-800/60 overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer aspect-square flex justify-center items-center" onClick={() => setPreviewingAsset(variant)}>
+                                                                <span className="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full z-10 font-semibold">{variant.variantLabel}</span>
+                                                                <AsyncImage assetId={variant.id} alt={`Variant logo: ${variant.prompt}`} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"/>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                             )}
                         </div>
@@ -870,6 +896,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
             onUpdateTags={handleUpdateAssetTags}
             availableTags={allLogoTags}
             onGenerateVariants={handleGenerateLogoVariants}
+            onSetPrimary={handleSetPrimaryLogo}
         />
       )}
 

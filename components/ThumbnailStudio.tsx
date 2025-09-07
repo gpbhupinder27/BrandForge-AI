@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Brand, BrandAsset } from '../types';
-import { generateWithNanoBanana, fileToBase64, generateTagsForCreative, describeImage, generatePromptSuggestions, generateThumbnailElementSuggestions } from '../services/geminiService';
+import { generateWithNanoBanana, fileToBase64, generateTagsForCreative, describeImage, generatePromptSuggestions, generateThumbnailElementSuggestions, generateThumbnailTextSuggestions } from '../services/geminiService';
 import { storeImage, getImage } from '../services/imageDb';
 import Loader from './Loader';
 import SparklesIcon from './icons/SparklesIcon';
@@ -50,6 +51,7 @@ const thumbnailTemplates = [
         overlayText: "IS IT WORTH IT?!",
         style: 'Vibrant & Energetic',
         emotion: 'Excited',
+        composition: 'Rule of Thirds: Subject Right',
     },
     {
         name: 'Tech Unboxing',
@@ -58,6 +60,7 @@ const thumbnailTemplates = [
         overlayText: "NEW GADGET UNBOXED!",
         style: 'Minimal & Clean',
         emotion: 'Curious',
+        composition: 'Center-Focused',
     },
     {
         name: 'Cooking Tutorial',
@@ -66,6 +69,7 @@ const thumbnailTemplates = [
         overlayText: "EASY 10-MINUTE RECIPE",
         style: 'Vibrant & Energetic',
         emotion: 'Happy',
+        composition: 'Center-Focused',
     },
     {
         name: 'Fitness Challenge',
@@ -74,6 +78,7 @@ const thumbnailTemplates = [
         overlayText: "30 DAY CHALLENGE",
         style: 'Dark & Moody',
         emotion: 'Serious / Focused',
+        composition: 'Rule of Thirds: Subject Left',
     },
     {
         name: 'Travel Vlog',
@@ -82,6 +87,7 @@ const thumbnailTemplates = [
         overlayText: "WE WENT HERE!",
         style: 'Cinematic',
         emotion: 'Shocked / Surprised',
+        composition: 'Rule of Thirds: Subject Left',
     },
     {
         name: 'DIY Tutorial',
@@ -90,6 +96,7 @@ const thumbnailTemplates = [
         overlayText: 'DIY PROJECT: STEP-BY-STEP',
         style: 'Minimal & Clean',
         emotion: 'Serious / Focused',
+        composition: 'Center-Focused',
     },
     {
         name: 'Productivity Hack',
@@ -98,6 +105,7 @@ const thumbnailTemplates = [
         overlayText: '5 HACKS TO 10X YOUR FOCUS',
         style: 'Vibrant & Energetic',
         emotion: 'Serious / Focused',
+        composition: 'Center-Focused',
     },
     {
         name: 'Movie Review',
@@ -106,6 +114,7 @@ const thumbnailTemplates = [
         overlayText: 'THE ENDING EXPLAINED',
         style: 'Cinematic',
         emotion: 'Curious',
+        composition: 'Rule of Thirds: Subject Right',
     },
     {
         name: 'Personal Vlog',
@@ -114,6 +123,7 @@ const thumbnailTemplates = [
         overlayText: 'MY WEEKLY UPDATE',
         style: 'Default',
         emotion: 'Happy',
+        composition: 'Center-Focused',
     },
     {
         name: 'Special Offer',
@@ -122,6 +132,7 @@ const thumbnailTemplates = [
         overlayText: '50% OFF TODAY!',
         style: 'Vibrant & Energetic',
         emotion: 'Excited',
+        composition: 'Center-Focused',
     },
     {
         name: 'Brand Teaser',
@@ -130,6 +141,7 @@ const thumbnailTemplates = [
         overlayText: 'OUR STORY',
         style: 'Cinematic',
         emotion: 'Curious',
+        composition: 'Rule of Thirds: Subject Left',
     },
     {
         name: 'Product Demo',
@@ -138,6 +150,7 @@ const thumbnailTemplates = [
         overlayText: 'SEE IT IN ACTION',
         style: 'Minimal & Clean',
         emotion: 'Happy',
+        composition: 'Center-Focused',
     }
 ];
 
@@ -149,13 +162,15 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     const [style, setStyle] = useState('Default');
     const [composition, setComposition] = useState('Default');
     const [emotion, setEmotion] = useState('None');
-    const [logoPosition, setLogoPosition] = useState<LogoPosition>('watermark');
+    const [logoPosition, setLogoPosition] = useState<LogoPosition>('top-right');
     const [baseImageFile, setBaseImageFile] = useState<File | null>(null);
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; }[]>([]);
+    const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; overlayText?: string; }[]>([]);
     const [isSuggesting, setIsSuggesting] = useState(false);
+    const [suggestedTexts, setSuggestedTexts] = useState<string[]>([]);
+    const [isSuggestingText, setIsSuggestingText] = useState(false);
     
     const [previewingAsset, setPreviewingAsset] = useState<BrandAsset | null>(null);
     const [editSession, setEditSession] = useState<EditSession | null>(null);
@@ -175,11 +190,12 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     const [suggestedElements, setSuggestedElements] = useState<string[]>([]);
     const [isSuggestingElements, setIsSuggestingElements] = useState(false);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+    const [selectedTemplateName, setSelectedTemplateName] = useState('Custom');
 
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const logoAsset = brand.assets.find(asset => asset.type === 'logo');
+    const logoAsset = brand.assets.find(asset => asset.type === 'logo' && asset.isPrimary) || brand.assets.find(asset => asset.type === 'logo');
     const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
     const thumbnailAssets = brand.assets.filter(asset => asset.type === 'youtube_thumbnail').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     const allThumbnailTags = useMemo(() => [...new Set(thumbnailAssets.flatMap(a => a.tags || []))].sort(), [thumbnailAssets]);
@@ -187,6 +203,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     useEffect(() => {
         setSuggestions([]);
         setSuggestedElements([]);
+        setSuggestedTexts([]);
     }, [baseImageFile, overlayText, baseImagePrompt]);
     
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,11 +213,14 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     };
     
     const handleTemplateClick = (template: typeof thumbnailTemplates[0]) => {
+        // The brand context is handled by the final prompt assembly.
+        // We only set the core request from the template here.
         setBaseImagePrompt(template.prompt);
         setOverlayText(template.overlayText);
         setStyle(template.style);
         setEmotion(template.emotion);
-        setComposition('Default');
+        setComposition(template.composition);
+        setSelectedTemplateName(template.name);
         setIsTemplateModalOpen(false);
     };
     
@@ -228,6 +248,25 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
         }
     };
     
+    const handleSuggestText = async () => {
+        setIsSuggestingText(true);
+        setSuggestedTexts([]);
+        setError(null);
+        try {
+            const result = await generateThumbnailTextSuggestions(
+                brand.description,
+                selectedTemplateName,
+                baseImagePrompt,
+                paletteAsset?.palette
+            );
+            setSuggestedTexts(result);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to get text suggestions.');
+        } finally {
+            setIsSuggestingText(false);
+        }
+    };
+
      const handleSuggestElements = async () => {
         setIsSuggestingElements(true);
         setSuggestedElements([]);
@@ -266,7 +305,6 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
         link.href = imageUrl;
         link.download = filename;
         document.body.appendChild(link);
-        link.click();
         document.body.removeChild(link);
     };
 
@@ -305,9 +343,14 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 const base64 = await fileToBase64(baseImageFile);
                 imageInputs.push({ data: base64, mimeType: baseImageFile.type });
             }
+            
+            let logoInstruction = 'Do not include the brand logo.';
+            if (logoPosition !== 'none') {
+                logoInstruction = `The first image provided is the brand logo. It is on a plain white background; you MUST treat this background as transparent and integrate ONLY the logo itself seamlessly onto the thumbnail. Do not include the white box from the logo's background. Place this logo in a ${logoPosition === 'watermark' ? 'subtle watermark style' : `clear and visible manner in the ${logoPosition.replace('-', ' ')} corner`}.`;
+            }
 
             let promptParts = [
-                'Create a high-impact, professional YouTube thumbnail (16:9 aspect ratio).',
+                'Create a high-impact, professional YouTube thumbnail (16:9 aspect ratio). The output image MUST be 1280px wide by 720px tall.',
                 baseImageFile 
                     ? `Use the user's uploaded image as the primary background or subject. The user's goal for the image is: "${baseImagePrompt}".`
                     : `The base image should be: "${baseImagePrompt}".`,
@@ -326,9 +369,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 paletteAsset?.palette
                     ? `Use the brand's color palette (${paletteAsset.palette.colors.map(c => c.hex).join(', ')}) for text, backgrounds, and accents to ensure high contrast and brand consistency.`
                     : '',
-                logoPosition !== 'none'
-                    ? `Place the provided brand logo in a ${logoPosition === 'watermark' ? 'subtle watermark style' : `clear and visible manner in the ${logoPosition.replace('-', ' ')} corner`}.`
-                    : 'Do not include the brand logo.'
+                logoInstruction
             ];
             const finalPrompt = promptParts.filter(p => p.trim() !== '').join(' ');
             
@@ -510,11 +551,27 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                     </div>
                     <textarea value={baseImagePrompt} onChange={(e) => setBaseImagePrompt(e.target.value)} rows={3} placeholder="e.g., A futuristic neon cityscape at night" className={inputClasses} disabled={isLoading} />
                     {suggestions.length > 0 && (
-                         <div className="mt-2 space-y-2">
+                        <div className="mt-2 space-y-2">
                             {suggestions.slice(0,2).map((s, i) => (
-                                <button key={i} onClick={() => setBaseImagePrompt(s.prompt)} className="w-full text-left p-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition-colors">
+                                <button
+                                    key={i}
+                                    onClick={() => {
+                                        setBaseImagePrompt(s.prompt);
+                                        if (s.overlayText) {
+                                            setOverlayText(s.overlayText);
+                                        }
+                                    }}
+                                    className="w-full text-left p-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition-colors"
+                                >
                                     <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{s.goal}</p>
-                                    <p className="text-xs text-slate-600 dark:text-slate-400">{s.prompt}</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                                        <span className="font-semibold">Image:</span> {s.prompt}
+                                    </p>
+                                    {s.overlayText && (
+                                        <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
+                                            <span className="font-semibold">Text:</span> "{s.overlayText}"
+                                        </p>
+                                    )}
                                 </button>
                             ))}
                         </div>
@@ -535,8 +592,23 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 </div>
                 
                 <div>
-                    <label htmlFor="overlay-text" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">2. Overlay Text</label>
+                    <div className="flex justify-between items-center mb-2">
+                        <label htmlFor="overlay-text" className="block text-sm font-semibold text-slate-700 dark:text-slate-300">2. Overlay Text</label>
+                        <button onClick={handleSuggestText} disabled={isSuggestingText || isLoading} className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50">
+                            <LightbulbIcon className="w-4 h-4" />
+                            {isSuggestingText ? 'Thinking...' : 'Suggest Text'}
+                        </button>
+                    </div>
                     <input id="overlay-text" type="text" value={overlayText} onChange={e => setOverlayText(e.target.value)} placeholder="e.g., YOU WON'T BELIEVE THIS!" className={inputClasses} disabled={isLoading} />
+                     {suggestedTexts.length > 0 && (
+                         <div className="mt-2 space-y-2">
+                            {suggestedTexts.map((text, i) => (
+                                <button key={i} onClick={() => setOverlayText(text)} className="w-full text-left p-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-md transition-colors text-sm font-medium">
+                                    "{text}"
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 
                  <div>
@@ -578,7 +650,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                 <div>
                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">6. Branding</label>
                      <div className="flex flex-wrap gap-2">
-                        {(['watermark', 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'none'] as LogoPosition[]).map(pos => (
+                        {(['top-right', 'top-left', 'bottom-left', 'bottom-right', 'watermark', 'none'] as LogoPosition[]).map(pos => (
                             <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
                                 {pos.replace('-', ' ')}
                             </button>
