@@ -18,7 +18,7 @@ export const generateVideoFromImage = async ({
     apiKey,
     imageUrl,
     prompt,
-    aspectRatio = '16:9'
+    aspectRatio = 'auto'
 }: FalImageToVideoParams): Promise<FalImageToVideoResponse> => {
     
     if (!apiKey) {

@@ -78,6 +78,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
     const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; }[]>([]);
     const [isSuggesting, setIsSuggesting] = useState(false);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+    const [previewingVideoAssetId, setPreviewingVideoAssetId] = useState<string | null>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -184,7 +185,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 apiKey: falApiKey,
                 imageUrl: activeImage.url,
                 prompt: videoPrompt,
-                aspectRatio: '16:9'
             });
             
             const videoUrl = videoResponse.video.url;
@@ -275,7 +275,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-6">
                     <div>
                         <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">{activeImage ? 'Step 2: Generate Video' : 'Step 1: Create Base Image'}</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">First, generate a static image for your video ad. The video will always be 16:9 widescreen.</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">First, generate a static image. The final video will match this image's aspect ratio.</p>
                     </div>
 
                     <div className={activeImage ? 'opacity-50 pointer-events-none' : ''}>
@@ -351,24 +351,56 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
 
                    {activeImage && (
                         <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
-                           <button onClick={handleGenerateVideo} disabled={isLoadingVideo || !falApiKey.trim()} className="w-full flex items-center justify-center gap-2 px-6 py-3 font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors disabled:opacity-50">
-                               <VideoIcon className="w-5 h-5" />
-                               {isLoadingVideo ? 'Generating Video...' : 'Generate Video from Image'}
-                           </button>
+                           <p className="text-sm text-center font-semibold text-slate-700 dark:text-slate-300">Happy with the image? Generate the video or try again.</p>
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <button
+                                    onClick={() => {
+                                        setActiveImage(null);
+                                        setEditPrompt('');
+                                    }}
+                                    disabled={isLoadingVideo}
+                                    className="px-6 py-3 font-semibold bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors"
+                                >
+                                    Cancel & Try Again
+                                </button>
+                                <button
+                                    onClick={handleGenerateVideo}
+                                    disabled={isLoadingVideo || !falApiKey.trim()}
+                                    className="flex items-center justify-center gap-2 px-6 py-3 font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors disabled:opacity-50"
+                                >
+                                    <VideoIcon className="w-5 h-5" />
+                                    {isLoadingVideo ? 'Generating Video...' : 'Generate Video'}
+                                </button>
+                            </div>
                         </div>
                    )}
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700/50 flex flex-col items-center justify-center min-h-[50vh]">
-                   {isLoadingImage ? <Loader message="Generating image..."/> : activeImage ? (
+                   {isLoadingImage && !activeImage ? <Loader message="Generating image..."/> : activeImage ? (
                         <div className="w-full space-y-4">
-                            <AsyncImage assetId={activeImage.id} alt="Generated image" className="w-full rounded-md object-contain" />
-                            <div>
-                                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Edit Image:</label>
-                                <div className="flex gap-2">
-                                    <input type="text" value={editPrompt} onChange={e => setEditPrompt(e.target.value)} placeholder="e.g., make it red" className={inputClasses} />
-                                    <button onClick={() => handleGenerateImage(true)} disabled={!editPrompt.trim()} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50">Edit</button>
-                                </div>
+                            <div className="relative">
+                                <AsyncImage 
+                                    assetId={activeImage.id} 
+                                    alt="Generated image" 
+                                    className={`w-full rounded-md object-contain transition-opacity ${isLoadingVideo ? 'opacity-30' : ''}`}
+                                />
+                                {isLoadingVideo && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-md">
+                                        <Loader message="Generating Video..." subMessage="This can take a few minutes."/>
+                                    </div>
+                                )}
                             </div>
+                            {!isLoadingVideo && (
+                                <div>
+                                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Quick Edit & Regenerate:</label>
+                                    <div className="flex gap-2">
+                                        <input type="text" value={editPrompt} onChange={e => setEditPrompt(e.target.value)} placeholder="e.g., make it red" className={inputClasses} />
+                                        <button onClick={() => handleGenerateImage(true)} disabled={!editPrompt.trim() || isLoadingImage} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50">
+                                            {isLoadingImage ? 'Editing...' : 'Edit'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                    ) : (
                     <div className="text-center text-slate-500 dark:text-slate-400">
@@ -376,7 +408,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                         <p className="mt-2 font-semibold">Your generated image will appear here</p>
                     </div>
                    )}
-                   {isLoadingVideo && <Loader message="Generating video, this may take a minute..."/>}
                 </div>
             </div>
 
@@ -403,6 +434,17 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 </div>
             )}
 
+            {previewingVideoAssetId && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setPreviewingVideoAssetId(null)}>
+                    <div className="bg-black rounded-lg max-w-5xl w-full shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => setPreviewingVideoAssetId(null)} className="absolute -top-3 -right-3 bg-white dark:bg-slate-700 p-1.5 rounded-full z-10 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600">
+                            <XMarkIcon className="w-6 h-6" />
+                        </button>
+                        <AsyncVideo assetId={previewingVideoAssetId} className="w-full h-auto max-h-[85vh] object-contain rounded-lg" controls autoPlay />
+                    </div>
+                </div>
+            )}
+
             <div className="mt-12">
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4">Generated Video Ads</h3>
                 {videoAssets.length === 0 ? (
@@ -414,7 +456,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {videoAssets.map(asset => (
-                            <div key={asset.id} className="group relative aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700/50">
+                            <div key={asset.id} onClick={() => setPreviewingVideoAssetId(asset.id)} className="group relative aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700/50 cursor-pointer">
                                <AsyncVideo assetId={asset.id} className="w-full h-full object-cover" />
                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex flex-col justify-end">
                                     <p className="text-xs font-semibold text-white drop-shadow-lg truncate">{asset.prompt}</p>

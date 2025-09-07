@@ -624,38 +624,6 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
                           </div>
                       )}
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Creative Type</label>
-                            <p className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 text-slate-900 dark:text-slate-100">
-                                Instagram Post (Square)
-                            </p>
-                          </div>
-                           <div>
-                              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Brand Logo</label>
-                              <div className="flex items-center justify-between p-2 bg-slate-100 dark:bg-slate-900/30 rounded-md">
-                                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Include Logo</span>
-                                <button
-                                    onClick={() => setAddLogo(!addLogo)}
-                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${addLogo ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                    role="switch"
-                                    aria-checked={addLogo}
-                                >
-                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${addLogo ? 'translate-x-5' : 'translate-x-0'}`} />
-                                </button>
-                              </div>
-                               <div className={`mt-3 transition-opacity ${!addLogo ? 'opacity-40 pointer-events-none' : ''}`}>
-                                 <div className="flex flex-wrap gap-2">
-                                     {(['top-right', 'top-left', 'bottom-right', 'bottom-left', 'watermark', 'none'] as LogoPosition[]).map(pos => (
-                                         <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
-                                             {pos.replace('-', ' ')}
-                                         </button>
-                                     ))}
-                                 </div>
-                              </div>
-                          </div>
-                      </div>
-
                       <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Upload Product Image (Optional)</label>
                             {productImage ? (
@@ -690,6 +658,38 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
                                 disabled={isLoading}
                             />
                         </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Creative Type</label>
+                            <p className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 text-slate-900 dark:text-slate-100">
+                                Instagram Post (Square)
+                            </p>
+                          </div>
+                           <div>
+                              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Brand Logo</label>
+                              <div className="flex items-center justify-between p-2 bg-slate-100 dark:bg-slate-900/30 rounded-md">
+                                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Include Logo</span>
+                                <button
+                                    onClick={() => setAddLogo(!addLogo)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${addLogo ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                    role="switch"
+                                    aria-checked={addLogo}
+                                >
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${addLogo ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                              </div>
+                               <div className={`mt-3 transition-opacity ${!addLogo ? 'opacity-40 pointer-events-none' : ''}`}>
+                                 <div className="flex flex-wrap gap-2">
+                                     {(['top-right', 'top-left', 'bottom-right', 'bottom-left', 'watermark', 'none'] as LogoPosition[]).map(pos => (
+                                         <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoading} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
+                                             {pos.replace('-', ' ')}
+                                         </button>
+                                     ))}
+                                 </div>
+                              </div>
+                          </div>
+                      </div>
                       
                       <div className="!mt-8 flex justify-center">
                           <button
