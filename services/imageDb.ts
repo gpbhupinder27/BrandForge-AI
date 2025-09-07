@@ -64,3 +64,37 @@ export const getImage = (id: string): Promise<string | undefined> => {
     }
   });
 };
+
+export const deleteImage = (id: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (!db) {
+      return reject("DB not initialized.");
+    }
+    try {
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        store.delete(id);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    } catch (error) {
+        reject(error);
+    }
+  });
+};
+
+export const deleteImages = (ids: string[]): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            return reject("DB not initialized.");
+        }
+        try {
+            const transaction = db.transaction(STORE_NAME, 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            ids.forEach(id => store.delete(id));
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+        } catch (error) {
+            reject(error);
+        }
+    });
+};

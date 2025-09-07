@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Brand, BrandAsset } from '../types';
 import { generateWithNanoBanana, fileToBase64, generateTagsForCreative, describeImage, generatePromptSuggestions, generateThumbnailElementSuggestions, generateThumbnailTextSuggestions } from '../services/geminiService';
@@ -213,9 +212,8 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     };
     
     const handleTemplateClick = (template: typeof thumbnailTemplates[0]) => {
-        // The brand context is handled by the final prompt assembly.
-        // We only set the core request from the template here.
-        setBaseImagePrompt(template.prompt);
+        const finalPrompt = `A YouTube thumbnail for a video from "${brand.name}". The brand's core identity is "${brand.description}". The style must be heavily inspired by this brand identity. The specific creative concept for the thumbnail is: ${template.prompt}`;
+        setBaseImagePrompt(finalPrompt);
         setOverlayText(template.overlayText);
         setStyle(template.style);
         setEmotion(template.emotion);
@@ -583,9 +581,12 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                              <button onClick={() => { setBaseImageFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80"><XMarkIcon className="w-4 h-4" /></button>
                          </div>
                      ) : (
-                        <button onClick={() => fileInputRef.current?.click()} className="w-full border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors">
-                             <ImageIcon className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-500" />
-                             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400"><span className="font-semibold text-indigo-600 dark:text-indigo-400">Upload an Image</span></p>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                        >
+                             <ImageIcon className="w-5 h-5" />
+                             Upload an Image
                         </button>
                      )}
                      <input type="file" accept="image/*" onChange={handleFileChange} ref={fileInputRef} className="hidden" disabled={isLoading} />

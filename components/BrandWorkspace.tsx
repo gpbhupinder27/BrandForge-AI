@@ -49,6 +49,7 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
   const [isInitializing, setIsInitializing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [viewingAssetId, setViewingAssetId] = useState<string | null>(null);
+  const [imageForVideoConversion, setImageForVideoConversion] = useState<string | null>(null);
 
   const logoAsset = brand.assets.find(asset => asset.type === 'logo' && asset.isPrimary) || brand.assets.find(asset => asset.type === 'logo');
   const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
@@ -110,11 +111,7 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
         // Step 3: Generate Logo using Palette and Typography info
         const logoPrompt = `A modern, minimalist logo for a brand called '${brand.name}' which is described as "${brand.description}". The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements. Use a color palette inspired by these hex codes: ${paletteResult.colors.map(c => c.hex).join(', ')}. The brand's typography feels like: "${typographyResult.headlineFont.description}".`;
         
-        const generationPromises = Array(3).fill(null).map(() => 
-            generateWithNanoBanana(logoPrompt, [], 1024, 1024)
-        );
-        const results = await Promise.all(generationPromises);
-        const logoParts = results.flat();
+        const logoParts = await generateWithNanoBanana(logoPrompt, [], 1024, 1024);
         
         const logoAssets: BrandAsset[] = [];
 
@@ -190,6 +187,12 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
         setIsExporting(false);
     }
   };
+
+  const handleRequestVideoConversion = (assetId: string) => {
+    setImageForVideoConversion(assetId);
+    setViewingAssetId(null); // Close detail view if open
+    setActiveTab('video_ads');
+  };
   
   const assetToView = viewingAssetId ? brand.assets.find(a => a.id === viewingAssetId) : null;
 
@@ -209,6 +212,7 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
             brand={brand}
             onBack={() => setViewingAssetId(null)}
             onUpdateBrand={onUpdateBrand}
+            onRequestVideoConversion={handleRequestVideoConversion}
         />;
     }
 
@@ -216,11 +220,16 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
         case 'identity':
             return <IdentityStudio brand={brand} onUpdateBrand={onUpdateBrand} />;
         case 'creatives':
-            return <CreativeLab brand={brand} onUpdateBrand={onUpdateBrand} />;
+            return <CreativeLab brand={brand} onUpdateBrand={onUpdateBrand} onRequestVideoConversion={handleRequestVideoConversion} />;
         case 'thumbnails':
             return <ThumbnailStudio brand={brand} onUpdateBrand={onUpdateBrand} />;
         case 'video_ads':
-            return <VideoAdStudio brand={brand} onUpdateBrand={onUpdateBrand} />;
+            return <VideoAdStudio
+                        brand={brand}
+                        onUpdateBrand={onUpdateBrand}
+                        initialImageId={imageForVideoConversion}
+                        onConversionHandled={() => setImageForVideoConversion(null)}
+                    />;
         case 'library':
             return <AssetLibrary 
                         brand={brand} 

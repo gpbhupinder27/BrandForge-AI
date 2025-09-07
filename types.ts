@@ -39,6 +39,8 @@ export interface BrandAsset {
   isPrimary?: boolean; // For selecting the main brand logo
   sourceVideoIds?: string[]; // For edited videos, the IDs of the source clips
   editedDetails?: string; // A description of the edits made
+  width?: number;
+  height?: number;
 }
 
 export interface Brand {

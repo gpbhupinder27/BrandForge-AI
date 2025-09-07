@@ -6,6 +6,7 @@ import DownloadIcon from './icons/DownloadIcon';
 import XMarkIcon from './icons/XMarkIcon';
 import BeakerIcon from './icons/BeakerIcon';
 import IdentificationIcon from './icons/IdentificationIcon';
+import VideoIcon from './icons/VideoIcon';
 
 interface AssetPreviewModalProps {
   asset: BrandAsset;
@@ -16,9 +17,10 @@ interface AssetPreviewModalProps {
   onGenerateVariants?: (asset: BrandAsset) => void;
   onSetPrimary?: (assetId: string) => void;
   availableTags?: string[];
+  onConvertToVideo?: (asset: BrandAsset) => void;
 }
 
-const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, onEdit, onDownload, onUpdateTags, onGenerateVariants, onSetPrimary, availableTags }) => {
+const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, onEdit, onDownload, onUpdateTags, onGenerateVariants, onSetPrimary, availableTags, onConvertToVideo }) => {
   const [tagInput, setTagInput] = useState('');
 
   useEffect(() => {
@@ -57,6 +59,7 @@ const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, o
   const isEditableAsset = ['logo', 'poster', 'banner', 'social_ad', 'instagram_story', 'twitter_post', 'youtube_thumbnail'].includes(asset.type);
   const isDownloadableAsset = isEditableAsset;
   const isVariantGeneratable = isEditableAsset && !asset.parentId;
+  const isVideoConvertible = ['logo', 'poster', 'banner', 'social_ad', 'instagram_story', 'twitter_post', 'youtube_thumbnail'].includes(asset.type) && !asset.parentId;
 
   const renderPreviewContent = () => {
     if (asset.type === 'palette' && asset.palette) {
@@ -163,6 +166,11 @@ const AssetPreviewModal: React.FC<AssetPreviewModalProps> = ({ asset, onClose, o
                     >
                         <IdentificationIcon className="w-4 h-4"/>
                         {asset.isPrimary ? 'Primary Logo' : 'Set as Primary'}
+                    </button>
+                )}
+                {isVideoConvertible && onConvertToVideo && (
+                    <button onClick={() => onConvertToVideo(asset)} className="w-full text-sm flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-500 transition-colors">
+                        <VideoIcon className="w-4 h-4" /> Convert to Video
                     </button>
                 )}
                 {isVariantGeneratable && onGenerateVariants && (

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Brand, BrandAsset, ColorPalette, TypographyPairing } from '../types';
-import { generateWithNanoBanana, fileToBase64, generateStructuredContent, describeImage, generatePromptSuggestions } from '../services/geminiService';
+import { generateWithNanoBanana, fileToBase64, generateStructuredContent, describeImage, generatePromptSuggestions, getImageDimensions } from '../services/geminiService';
 import { storeImage, getImage } from '../services/imageDb';
 import { Type } from "@google/genai";
 import Loader from './Loader';
@@ -35,25 +35,25 @@ const logoTemplateCategories = [
             {
                 name: 'Geometric Mark',
                 description: 'Clean, modern, and abstract.',
-                prompt: "A minimalist, modern logo for '[Brand Name]'. Use simple geometric shapes like circles, squares, or triangles. The design should be clean, abstract, and memorable.",
+                prompt: "A minimalist, modern logo using simple geometric shapes like circles, squares, or triangles. The design should be clean, abstract, and memorable.",
                 icon: <RectangleStackIcon className="w-6 h-6" />
             },
             {
                 name: 'Clean Wordmark',
                 description: 'Modern sans-serif typography.',
-                prompt: "A minimalist and clean wordmark logo for '[Brand Name]'. Use a modern, sans-serif font like Inter, Poppins, or Montserrat. The focus is on perfect kerning and simplicity.",
+                prompt: "A minimalist and clean wordmark logo using a modern, sans-serif font like Inter, Poppins, or Montserrat. The focus is on perfect kerning and simplicity.",
                 icon: <TypographyIcon className="w-6 h-6" />
             },
             {
                 name: 'Initials Monogram',
                 description: 'Cleverly combined initials.',
-                prompt: "A clever and simple monogram logo using the initials of '[Brand Name]'. The initials should be intertwined or combined in a unique, memorable way.",
+                prompt: "A clever and simple monogram logo using the brand's initials. The initials should be intertwined or combined in a unique, memorable way.",
                 icon: <IdentificationIcon className="w-6 h-6" />
             },
             {
                 name: 'Line Art Icon',
                 description: 'Elegant, single-line illustration.',
-                prompt: "A single-line, continuous line art icon that represents the core concept of '[Brand Name]'. The style is delicate, modern, and abstract.",
+                prompt: "A single-line, continuous line art icon that represents the brand's core concept. The style is delicate, modern, and abstract.",
                 icon: <EditIcon className="w-6 h-6" />
             }
         ]
@@ -64,25 +64,25 @@ const logoTemplateCategories = [
             {
                 name: 'Elegant Serif',
                 description: 'Classic, sophisticated, and timeless.',
-                prompt: "An elegant and luxurious logo for '[Brand Name]'. Feature the brand name in a classic serif font. The style should be sophisticated and timeless, possibly with a simple monogram or icon.",
+                prompt: "An elegant and luxurious logo featuring the brand name in a classic serif font. The style should be sophisticated and timeless, possibly with a simple monogram or icon.",
                 icon: <TypographyIcon className="w-6 h-6" />
             },
             {
                 name: 'Luxury Emblem',
                 description: 'Established, premium, and detailed.',
-                prompt: "A classic and detailed emblem or crest for '[Brand Name]'. Incorporate elements like laurels, banners, and a central monogram. The style should feel established and premium.",
+                prompt: "A classic and detailed emblem or crest. Incorporate elements like laurels, banners, and a central monogram. The style should feel established and premium.",
                 icon: <RectangleStackIcon className="w-6 h-6" />
             },
             {
                 name: 'Signature Script',
                 description: 'Personal, handcrafted, and flowing.',
-                prompt: "A beautiful, flowing signature script logo for '[Brand Name]'. The style should feel personal, handcrafted, and elegant.",
+                prompt: "A beautiful, flowing signature script logo. The style should feel personal, handcrafted, and elegant.",
                 icon: <EditIcon className="w-6 h-6" />
             },
             {
                 name: 'Art Deco',
                 description: 'Glamorous, geometric, and symmetrical.',
-                prompt: "An Art Deco-inspired logo for '[Brand Name]'. Use strong geometric patterns, symmetry, and luxurious metallic colors. The style should be glamorous and sophisticated.",
+                prompt: "An Art Deco-inspired logo. Use strong geometric patterns, symmetry, and luxurious metallic colors. The style should be glamorous and sophisticated.",
                 icon: <TemplateIcon className="w-6 h-6" />
             }
         ]
@@ -93,25 +93,25 @@ const logoTemplateCategories = [
             {
                 name: 'Abstract Mark',
                 description: 'Dynamic, unique, and conceptual.',
-                prompt: "An abstract, dynamic logo mark for '[Brand Name]'. The design should represent the brand's core ideas using flowing lines, unique shapes, or an interesting visual concept. It should be modern and versatile.",
+                prompt: "An abstract, dynamic logo mark. The design should represent the brand's core ideas using flowing lines, unique shapes, or an interesting visual concept. It should be modern and versatile.",
                 icon: <BeakerIcon className="w-6 h-6" />
             },
             {
                 name: 'Gradient Shape',
                 description: 'Vibrant, tech-forward, and energetic.',
-                prompt: "A vibrant logo for '[Brand Name]' featuring a modern abstract shape with a smooth, colorful gradient. The style is tech-forward and energetic.",
+                prompt: "A vibrant logo featuring a modern abstract shape with a smooth, colorful gradient. The style is tech-forward and energetic.",
                 icon: <PaletteIcon className="w-6 h-6" />
             },
             {
                 name: 'Negative Space',
                 description: 'Smart, clever, with a hidden meaning.',
-                prompt: "A clever logo for '[Brand Name]' that uses negative space to reveal a hidden symbol or initial related to the brand. The design is smart and minimalist.",
+                prompt: "A clever logo that uses negative space to reveal a hidden symbol or initial related to the brand. The design is smart and minimalist.",
                 icon: <ScissorsIcon className="w-6 h-6" />
             },
             {
                 name: '3D / Isometric',
                 description: 'Dimensional, technical, and innovative.',
-                prompt: "A 3D isometric logo for '[Brand Name]'. The design should have depth and perspective, giving a sense of dimensionality. The style is modern, technical, and innovative.",
+                prompt: "A 3D isometric logo. The design should have depth and perspective, giving a sense of dimensionality. The style is modern, technical, and innovative.",
                 icon: <RectangleStackIcon className="w-6 h-6" />
             }
         ]
@@ -122,25 +122,25 @@ const logoTemplateCategories = [
             {
                 name: 'Playful Mascot',
                 description: 'Friendly, fun, and approachable character.',
-                prompt: "A fun and friendly mascot logo for '[Brand Name]'. Create a simple, cute character that represents the brand's friendly and approachable personality. The mascot should be memorable.",
+                prompt: "A fun and friendly mascot logo. Create a simple, cute character that represents the brand's friendly and approachable personality. The mascot should be memorable.",
                 icon: <SparklesIcon className="w-6 h-6" />
             },
             {
                 name: 'Hand-Drawn Charm',
                 description: 'Organic, rustic, and authentic.',
-                prompt: "A charming, hand-drawn logo for '[Brand Name]'. The style should feel organic, rustic, and authentic, with imperfect lines and a warm personality.",
+                prompt: "A charming, hand-drawn logo. The style should feel organic, rustic, and authentic, with imperfect lines and a warm personality.",
                 icon: <WandIcon className="w-6 h-6" />
             },
             {
                 name: 'Colorful Abstract',
                 description: 'Artistic, dynamic, and vibrant.',
-                prompt: "A creative logo for '[Brand Name]' made of overlapping, colorful, semi-transparent abstract shapes. The style is vibrant, artistic, and dynamic.",
+                prompt: "A creative logo made of overlapping, colorful, semi-transparent abstract shapes. The style is vibrant, artistic, and dynamic.",
                 icon: <BeakerIcon className="w-6 h-6" />
             },
             {
                 name: 'Pattern-Based',
                 description: 'Decorative, bold, and eye-catching.',
-                prompt: "A logo for '[Brand Name]' where the name is encased within a unique, repeating pattern. The style is bold, decorative, and eye-catching.",
+                prompt: "A logo where the name is encased within a unique, repeating pattern. The style is bold, decorative, and eye-catching.",
                 icon: <TemplateIcon className="w-6 h-6" />
             }
         ]
@@ -190,6 +190,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
   const [editPrompt, setEditPrompt] = useState('');
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [refImageDims, setRefImageDims] = useState<{width: number, height: number} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [suggestions, setSuggestions] = useState<{ goal: string; prompt: string; overlayText?: string; }[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -217,6 +218,20 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
         setManualBodyFont(typographyAsset.typography.bodyFont.name);
     }
   }, [typographyAsset]);
+
+  useEffect(() => {
+    if (referenceImage) {
+        const img = new Image();
+        const url = URL.createObjectURL(referenceImage);
+        img.onload = () => {
+            setRefImageDims({ width: img.width, height: img.height });
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
+    } else {
+        setRefImageDims(null);
+    }
+  }, [referenceImage]);
   
   const assetGroups = useMemo(() => {
     const originals = logoAssets.filter(a => !a.parentId);
@@ -248,9 +263,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
   };
   
   const handleTemplateClick = (templatePrompt: string) => {
-    let finalPrompt = templatePrompt;
-    // Replace placeholders with brand-specific details
-    finalPrompt = finalPrompt.replace(/\[Brand Name\]/gi, brand.name);
+    const finalPrompt = `A logo for a brand named "${brand.name}", which is described as "${brand.description}". The creative direction is: ${templatePrompt}`;
     setLogoPrompt(finalPrompt);
     setIsLogoTemplateModalOpen(false);
   };
@@ -398,6 +411,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
 
     try {
       let generatedParts;
+      const { width: targetWidth, height: targetHeight } = refImageDims ? refImageDims : { width: 1024, height: 1024 };
 
       const paletteInfo = paletteAsset?.palette ? ` Use a color palette inspired by these hex codes: ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}.` : '';
       const typoInfo = typographyAsset?.typography ? ` The brand's typography feels like: "${typographyAsset.typography.headlineFont.description}".` : '';
@@ -412,22 +426,18 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
           const base64 = await fileToBase64(file);
           const imageInputs = [{ data: base64, mimeType: file.type }];
           const finalPrompt = `Update the provided logo for a brand named "${brand.name}". User request: "${currentPrompt}". Keep the brand name clear. The logo MUST be on a plain, solid white background.`;
-          generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, 1024, 1024);
+          generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, targetWidth, targetHeight);
       } else if (referenceImage) {
           // GENERATION with reference: Use nano-banana
           const base64 = await fileToBase64(referenceImage);
           const imageInputs = [{ data: base64, mimeType: referenceImage.type }];
           const referenceInfo = ` The user has provided a reference image; use it as strong visual inspiration for the logo's style, shape, and overall concept.`;
           const finalPrompt = `Create a logo for a brand named "${brand.name}". User request: "${currentPrompt}".${paletteInfo}${typoInfo}${referenceInfo} The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements.`;
-          generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, 1024, 1024);
+          generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, targetWidth, targetHeight);
       } else {
           // PURE TEXT-TO-IMAGE GENERATION: Use Nano Banana
           const finalPrompt = `Create a logo for a brand named "${brand.name}". User request: "${currentPrompt}".${paletteInfo}${typoInfo} The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements.`;
-          const generationPromises = Array(3).fill(null).map(() => 
-              generateWithNanoBanana(finalPrompt, [], 1024, 1024)
-          );
-          const results = await Promise.all(generationPromises);
-          generatedParts = results.flat();
+          generatedParts = await generateWithNanoBanana(finalPrompt, [], targetWidth, targetHeight);
       }
       
       const newAssets: BrandAsset[] = [];
@@ -435,14 +445,17 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
 
       for (const [index, part] of generatedParts.filter(p => 'inlineData' in p).entries()) {
         if ('inlineData' in part) {
+          const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          const { width, height } = await getImageDimensions(imageUrl);
           const asset: BrandAsset = {
             id: crypto.randomUUID(),
             type: 'logo',
             prompt: currentPrompt,
             createdAt: new Date().toISOString(),
             isPrimary: !baseAsset && existingLogos.length === 0 && index === 0, // Make first logo primary if none exist
+            width,
+            height,
           };
-          const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           await storeImage(asset.id, imageUrl);
           newAssets.push(asset);
         }
@@ -802,7 +815,11 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
                                             {isPrimary && (
                                                 <div className="absolute top-2 right-2 bg-indigo-600 text-white text-xs font-semibold px-2 py-1 rounded-full z-10">Primary</div>
                                             )}
-                                            <div className="group relative cursor-pointer aspect-square rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50" onClick={() => setPreviewingAsset(original)}>
+                                            <div
+                                                className="group relative cursor-pointer rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50"
+                                                style={{ aspectRatio: original.width && original.height ? `${original.width} / ${original.height}` : '1 / 1' }}
+                                                onClick={() => setPreviewingAsset(original)}
+                                            >
                                                 <AsyncImage assetId={original.id} alt="Generated logo" className="w-full h-full object-contain p-2"/>
                                                 <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 text-left">
                                                 <p className="text-xs text-slate-300 max-h-12 overflow-hidden">{original.prompt}</p>

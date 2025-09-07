@@ -6,18 +6,21 @@ import EditIcon from './icons/EditIcon';
 import DownloadIcon from './icons/DownloadIcon';
 import BeakerIcon from './icons/BeakerIcon';
 import XMarkIcon from './icons/XMarkIcon';
-import { generateWithNanoBanana, fileToBase64 } from '../services/geminiService';
-import { storeImage, getImage } from '../services/imageDb';
+import { generateWithNanoBanana, fileToBase64, getImageDimensions } from '../services/geminiService';
+import { storeImage, getImage, deleteImages } from '../services/imageDb';
 import Loader from './Loader';
 import ClipboardIcon from './icons/ClipboardIcon';
 import WandIcon from './icons/WandIcon';
 import AsyncVideo from './AsyncVideo';
+import TrashIcon from './icons/TrashIcon';
+import VideoIcon from './icons/VideoIcon';
 
 interface AssetDetailViewProps {
   asset: BrandAsset;
   brand: Brand;
   onBack: () => void;
   onUpdateBrand: (updatedBrand: Brand) => void;
+  onRequestVideoConversion?: (assetId: string) => void;
 }
 
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -42,7 +45,7 @@ const QUICK_EDITS = [
 ];
 
 
-const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack, onUpdateBrand }) => {
+const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack, onUpdateBrand, onRequestVideoConversion }) => {
     const [tagInput, setTagInput] = useState('');
     const [isPromptEditing, setIsPromptEditing] = useState(false);
     const [promptInputValue, setPromptInputValue] = useState(asset.prompt);
@@ -99,6 +102,28 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const handleDelete = async () => {
+        if (window.confirm(`Are you sure you want to permanently delete this ${ASSET_TYPE_LABELS[asset.type]}? This will also delete any associated variants and cannot be undone.`)) {
+            try {
+                const variantIds = brand.assets
+                    .filter(a => a.parentId === asset.id)
+                    .map(a => a.id);
+                
+                const idsToDelete = [asset.id, ...variantIds];
+
+                const updatedAssets = brand.assets.filter(a => !idsToDelete.includes(a.id));
+                onUpdateBrand({ ...brand, assets: updatedAssets });
+
+                await deleteImages(idsToDelete);
+
+                onBack();
+            } catch (err) {
+                console.error("Failed to delete asset:", err);
+                setError(err instanceof Error ? err.message : "Could not delete asset from database.");
+            }
+        }
     };
 
     const handleCopy = async () => {
@@ -184,6 +209,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                 const newId = crypto.randomUUID();
                 const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                 await storeImage(newId, imageUrl);
+                const { width: genWidth, height: genHeight } = await getImageDimensions(imageUrl);
                 newAssets.push({
                     id: newId,
                     type: baseAsset.type,
@@ -195,7 +221,9 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                     createdAt: new Date().toISOString(),
                     tags: baseAsset.tags || [],
                     parentId: isVariant ? baseAsset.id : undefined,
-                    variantLabel: isVariant ? `Variant ${index + 1}` : undefined
+                    variantLabel: isVariant ? `Variant ${index + 1}` : undefined,
+                    width: genWidth,
+                    height: genHeight,
                 });
             }
         }
@@ -223,6 +251,12 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
             setError(err instanceof Error ? err.message : `An unknown error occurred.`);
         } finally {
             setIsLoading(false);
+        }
+    };
+    
+    const handleConvertToVideo = () => {
+        if (onRequestVideoConversion) {
+            onRequestVideoConversion(asset.id);
         }
     };
 
@@ -269,6 +303,7 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
 
     const isActionableAsset = ['logo', 'poster', 'banner', 'social_ad', 'instagram_story', 'twitter_post', 'youtube_thumbnail'].includes(asset.type);
     const isVariantGeneratable = isActionableAsset && !asset.parentId;
+    const isVideoConvertible = ['logo', 'poster', 'banner', 'social_ad', 'instagram_story', 'twitter_post', 'youtube_thumbnail'].includes(asset.type) && !asset.parentId;
 
     return (
         <div className="animate-fade-in">
@@ -366,6 +401,11 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                                     <BeakerIcon className="w-4 h-4" /> Generate A/B Variants
                                 </button>
                             )}
+                            {isVideoConvertible && onRequestVideoConversion && (
+                                <button onClick={handleConvertToVideo} className="w-full text-sm flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-500 transition-colors">
+                                    <VideoIcon className="w-4 h-4" /> Convert to Video Ad
+                                </button>
+                            )}
                              <div className="grid grid-cols-2 gap-3">
                                 <button 
                                     onClick={handleCopy} 
@@ -378,6 +418,13 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
                                     <DownloadIcon className="w-4 h-4" /> Download
                                 </button>
                             </div>
+                             <button 
+                                onClick={handleDelete} 
+                                disabled={isLoading}
+                                className="w-full mt-2 text-sm flex items-center justify-center gap-2 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 px-4 py-2 rounded-md hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+                            >
+                                <TrashIcon className="w-4 h-4" /> Delete Asset
+                            </button>
                         </div>
                     </div>
                 </div>

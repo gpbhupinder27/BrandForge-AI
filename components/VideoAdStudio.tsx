@@ -9,11 +9,13 @@ import VideoEditor from './VideoEditor';
 interface VideoAdStudioProps {
   brand: Brand;
   onUpdateBrand: (brand: Brand) => void;
+  initialImageId?: string | null;
+  onConversionHandled?: () => void;
 }
 
 type StudioTab = 'generator' | 'editor';
 
-const VideoAdStudio: React.FC<VideoAdStudioProps> = ({ brand, onUpdateBrand }) => {
+const VideoAdStudio: React.FC<VideoAdStudioProps> = ({ brand, onUpdateBrand, initialImageId, onConversionHandled }) => {
     const [activeTab, setActiveTab] = useState<StudioTab>('generator');
     const [falApiKey, setFalApiKey] = useLocalStorage('fal-api-key', '');
     const [apiKeyInput, setApiKeyInput] = useState('');
@@ -58,6 +60,8 @@ const VideoAdStudio: React.FC<VideoAdStudioProps> = ({ brand, onUpdateBrand }) =
                         onUpdateBrand={onUpdateBrand} 
                         falApiKey={falApiKey}
                         videoAssets={videoAssets}
+                        initialImageId={initialImageId}
+                        onConversionHandled={onConversionHandled}
                     />
                 )}
                  {activeTab === 'editor' && (

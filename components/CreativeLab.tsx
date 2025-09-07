@@ -1,7 +1,6 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Brand, BrandAsset, AssetType, CustomTemplate } from '../types';
-import { generateWithNanoBanana, fileToBase64, generateTagsForCreative, describeImage, generatePromptSuggestions } from '../services/geminiService';
+import { generateWithNanoBanana, fileToBase64, generateTagsForCreative, describeImage, generatePromptSuggestions, getImageDimensions } from '../services/geminiService';
 import { storeImage, getImage } from '../services/imageDb';
 import Loader from './Loader';
 import SparklesIcon from './icons/SparklesIcon';
@@ -16,29 +15,16 @@ import TrashIcon from './icons/TrashIcon';
 import XMarkIcon from './icons/XMarkIcon';
 import ChatBubbleIcon from './icons/ChatBubbleIcon';
 import BeakerIcon from './icons/BeakerIcon';
+import VideoIcon from './icons/VideoIcon';
 
 interface CreativeLabProps {
   brand: Brand;
   onUpdateBrand: (brand: Brand) => void;
+  onRequestVideoConversion: (assetId: string) => void;
 }
 
 type LogoPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'watermark' | 'none';
 type CreativeTab = 'single' | 'campaign';
-
-interface CreativeOption {
-    label: string;
-    type: AssetType;
-    width: number;
-    height: number;
-}
-
-const creativeTypeOptions: CreativeOption[] = [
-    { label: 'Instagram Post (1:1)', type: 'social_ad', width: 1080, height: 1080 },
-    { label: 'Instagram Story (9:16)', type: 'instagram_story', width: 1080, height: 1920 },
-    { label: 'Web Banner (1.91:1)', type: 'banner', width: 1200, height: 628 },
-    { label: 'Twitter Post (16:9)', type: 'twitter_post', width: 1600, height: 900},
-];
-const campaignAssets: CreativeOption[] = creativeTypeOptions;
 
 const templates = [
     {
@@ -50,19 +36,19 @@ const templates = [
     {
         name: 'New Product Launch',
         description: 'Showcase a new product.',
-        prompt: 'A clean, modern, and minimalist banner to announce a new product launch. The background should be simple to make the product stand out. Headline text: "The Future is Here". Sub-headline: "Introducing the new [Product Name]".',
+        prompt: 'A clean, modern, and minimalist banner to announce a new product launch. The background should be simple to make the product stand out. Headline text: "The Future is Here". Sub-headline: "Introducing our new collection".',
         icon: <ImageIcon className="w-6 h-6" />
     },
     {
         name: 'Event Invitation',
         description: 'Invite your audience to an event.',
-        prompt: 'An elegant and professional invitation for a webinar event. Title: "You\'re Invited". Include clearly legible text placeholders for [Event Title], [Date], [Time], and a "Register Now" call-to-action button.',
+        prompt: 'An elegant and professional invitation for a webinar event. Title: "You\'re Invited". Include clearly legible text placeholders for an event title, date, time, and a "Register Now" call-to-action button.',
         icon: <TemplateIcon className="w-6 h-6" />
     },
     {
         name: 'Customer Testimonial',
         description: 'Highlight a positive review.',
-        prompt: 'A visually appealing social media post featuring a customer testimonial. Prominently display the quote: "[Customer Quote Here]". Include the customer\'s name, "[Customer Name]". The design should feel authentic and trustworthy.',
+        prompt: 'A visually appealing social media post featuring a customer testimonial. Prominently display a placeholder for a customer quote and name. The design should feel authentic and trustworthy.',
         icon: <ChatBubbleIcon className="w-6 h-6" />
     },
     {
@@ -79,15 +65,16 @@ const templates = [
     }
 ];
 
-const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
+const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onRequestVideoConversion }) => {
   const [activeCreativeTab, setActiveCreativeTab] = useState<CreativeTab>('single');
   const [prompt, setPrompt] = useState('');
   const [campaignPrompt, setCampaignPrompt] = useState('');
   const [selectedCampaignTypes, setSelectedCampaignTypes] = useState<AssetType[]>(['social_ad']);
-  const [creativeType, setCreativeType] = useState<AssetType>('social_ad');
   const [logoPosition, setLogoPosition] = useState<LogoPosition>('top-right');
   const [productImage, setProductImage] = useState<File | null>(null);
+  const [productImageDims, setProductImageDims] = useState<{ width: number; height: number } | null>(null);
   const [campaignImage, setCampaignImage] = useState<File | null>(null);
+  const [campaignImageDims, setCampaignImageDims] = useState<{ width: number; height: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Crafting your creative...");
   const [error, setError] = useState<string | null>(null);
@@ -116,11 +103,40 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
 
   useEffect(() => {
     setSuggestions([]);
-  }, [creativeType, productImage]);
+  }, [productImage]);
 
   useEffect(() => {
     setCampaignSuggestions([]);
   }, [campaignImage]);
+
+  useEffect(() => {
+    if (productImage) {
+        const img = new Image();
+        const url = URL.createObjectURL(productImage);
+        img.onload = () => {
+            setProductImageDims({ width: img.width, height: img.height });
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
+    } else {
+        setProductImageDims(null);
+    }
+  }, [productImage]);
+
+  useEffect(() => {
+    if (campaignImage) {
+        const img = new Image();
+        const url = URL.createObjectURL(campaignImage);
+        img.onload = () => {
+            setCampaignImageDims({ width: img.width, height: img.height });
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
+    } else {
+        setCampaignImageDims(null);
+    }
+  }, [campaignImage]);
+
 
   const handleFilterToggle = (tag: string) => {
     setActiveFilters(prev => 
@@ -180,13 +196,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
   };
 
   const handleTemplateClick = (templatePrompt: string) => {
-    let finalPrompt = templatePrompt;
-    // Replace common placeholders with brand-specific details
-    finalPrompt = finalPrompt.replace(/\[Product Name\]/gi, brand.name);
-    finalPrompt = finalPrompt.replace(/\[Event Title\]/gi, `${brand.name} Online Workshop`); // A sensible default
-
-    // The brand context (palette, etc.) is added during the generation call.
-    // We only need the core user request here.
+    const finalPrompt = `A marketing creative for "${brand.name}", a brand that is all about "${brand.description}". The creative direction is: ${templatePrompt}`;
     setPrompt(finalPrompt);
     setIsCreativeTemplateModalOpen(false);
   };
@@ -217,7 +227,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     e.stopPropagation();
   };
 
-  const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, logoPos: LogoPosition | null, baseAsset?: BrandAsset): Promise<BrandAsset[]> => {
+  const runGeneration = async (generationPrompt: string, assetType: AssetType, imageToIncorporate: File | null, logoPos: LogoPosition | null, baseAsset?: BrandAsset, dims?: {width: number, height: number} | null): Promise<BrandAsset[]> => {
     if (!logoAsset) {
         throw new Error("Please generate a logo in the Identity Studio before creating marketing assets.");
     }
@@ -267,13 +277,14 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
 
     const imageIncorporateInstruction = imageToIncorporate && !baseAsset ? 'A key part of this request is to use the user-provided image (the one that is not the logo). This image is a product photo or a key brand asset. It MUST be prominently featured as the central element of the final design. The rest of the creative should be built around it.' : '';
     
-    const dimensions = creativeTypeOptions.find(opt => opt.type === assetType);
-    const sizeInstruction = dimensions ? ` The output image dimensions MUST be exactly ${dimensions.width}px wide by ${dimensions.height}px tall.` : '';
+    const targetWidth = dims ? dims.width : 1080;
+    const targetHeight = dims ? dims.height : 1080;
+    const sizeInstruction = ` The output image dimensions MUST be exactly ${targetWidth}px wide by ${targetHeight}px tall.`;
       
     const fullPrompt = `Using the provided brand logo (and other images if available), create a marketing asset.${sizeInstruction} ${imageIncorporateInstruction} ${logoPlacementInstruction} The user's request is: "${generationPrompt}". Ensure the brand logo is clearly visible and the overall style is consistent with the brand.${paletteInfo}`;
     
     const [generatedParts, generatedTags] = await Promise.all([
-        generateWithNanoBanana(fullPrompt, imageInputs, dimensions?.width, dimensions?.height),
+        generateWithNanoBanana(fullPrompt, imageInputs, targetWidth, targetHeight),
         generateTagsForCreative(generationPrompt)
     ]);
     
@@ -283,12 +294,15 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
           const newId = crypto.randomUUID();
           const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           await storeImage(newId, imageUrl);
+          const { width, height } = await getImageDimensions(imageUrl);
           assetsToCreate.push({
             id: newId,
             type: assetType,
             prompt: generationPrompt,
             createdAt: new Date().toISOString(),
             tags: generatedTags,
+            width,
+            height,
           });
         }
     }
@@ -297,7 +311,6 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
   
   const handleGenerate = async (baseAsset?: BrandAsset) => {
     const currentPrompt = baseAsset ? editPrompt : prompt;
-    const currentType = baseAsset ? baseAsset.type : creativeType;
     if (!currentPrompt.trim()) return;
 
     setIsLoading(true);
@@ -305,7 +318,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     setLoadingMessage("Crafting your creative...");
 
     try {
-        const newAssets = await runGeneration(currentPrompt, currentType, productImage, logoPosition, baseAsset);
+        const newAssets = await runGeneration(currentPrompt, 'social_ad', productImage, logoPosition, baseAsset, productImageDims);
         if (newAssets.length > 0) {
             onUpdateBrand({ ...brand, assets: [...brand.assets, ...newAssets] });
         }
@@ -327,18 +340,18 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     setIsLoading(true);
     setError(null);
 
-    const campaignAssetsToGenerate = campaignAssets.filter(asset => selectedCampaignTypes.includes(asset.type));
+    const campaignAssetsToGenerate = selectedCampaignTypes;
     const allNewAssets: BrandAsset[] = [];
 
     for (let i = 0; i < campaignAssetsToGenerate.length; i++) {
-        const asset = campaignAssetsToGenerate[i];
-        setLoadingMessage(`Generating Campaign (${i+1}/${campaignAssetsToGenerate.length}): ${asset.label}...`);
+        const assetType = campaignAssetsToGenerate[i];
+        setLoadingMessage(`Generating Campaign (${i+1}/${campaignAssetsToGenerate.length}): ${assetType}...`);
         try {
-            const campaignAssetPrompt = `Generate a ${asset.label} for the following campaign: "${campaignPrompt}".`;
-            const newAssets = await runGeneration(campaignAssetPrompt, asset.type, campaignImage, null);
+            const campaignAssetPrompt = `Generate a ${assetType.replace('_', ' ')} for the following campaign: "${campaignPrompt}".`;
+            const newAssets = await runGeneration(campaignAssetPrompt, assetType, campaignImage, null, undefined, campaignImageDims);
             allNewAssets.push(...newAssets);
         } catch(err) {
-            setError(err instanceof Error ? `Failed on ${asset.label}: ${err.message}` : `An unknown error occurred during ${asset.label} generation.`);
+            setError(err instanceof Error ? `Failed on ${assetType}: ${err.message}` : `An unknown error occurred during ${assetType} generation.`);
             break; 
         }
     }
@@ -385,8 +398,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
 
           const variantPrompt = `Create exactly 2 A/B test variations for the provided marketing creative. The original goal was: "${baseAsset.prompt}". Generate two distinct versions that target different marketing angles. For example, one variant could have a stronger call-to-action focused on a limited-time sale (e.g., "50% Off Today!"), while the other could focus on a product feature or building brand engagement (e.g., "Experience the new..."). The variations should explore different headlines, secondary text, or color schemes to achieve these different goals. Do not change the brand logo's placement or design.`;
           
-          const dimensions = creativeTypeOptions.find(opt => opt.type === baseAsset.type);
-          const generatedParts = await generateWithNanoBanana(variantPrompt, imageInputs, dimensions?.width, dimensions?.height);
+          const generatedParts = await generateWithNanoBanana(variantPrompt, imageInputs, baseAsset.width || 1080, baseAsset.height || 1080);
 
           const newVariantAssets: BrandAsset[] = [];
           for (const [index, part] of generatedParts.filter(p => 'inlineData' in p).entries()) {
@@ -401,7 +413,9 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                       createdAt: new Date().toISOString(),
                       tags: baseAsset.tags || [],
                       parentId: baseAsset.id,
-                      variantLabel: `Variant ${index + 1}`
+                      variantLabel: `Variant ${index + 1}`,
+                      width: baseAsset.width,
+                      height: baseAsset.height,
                   });
               }
           }
@@ -452,7 +466,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
 
         const creativeTypeLabel = isCampaign 
             ? "Marketing Campaign" 
-            : creativeTypeOptions.find(opt => opt.type === creativeType)?.label || "Creative Asset";
+            : "Instagram Post";
 
         const generatedSuggestions = await generatePromptSuggestions(
             creativeTypeLabel, 
@@ -505,6 +519,11 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
         ...brand,
         customTemplates: updatedTemplates
     });
+  };
+
+  const handleConvertToVideo = (assetToConvert: BrandAsset) => {
+    setPreviewingAsset(null); // Close the modal
+    onRequestVideoConversion(assetToConvert.id);
   };
 
 
@@ -672,10 +691,10 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                       )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Creative Type</label>
-                              <select value={creativeType} onChange={e => setCreativeType(e.target.value as AssetType)} disabled={isLoading} className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100">
-                                  {creativeTypeOptions.map(opt => <option key={opt.type} value={opt.type}>{opt.label}</option>)}
-                              </select>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Creative Type</label>
+                            <p className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 text-slate-900 dark:text-slate-100">
+                                Instagram Post (Square)
+                            </p>
                           </div>
                           {renderImageUpload("Upload Product Image (Optional)", productImage, setProductImage, fileInputRef, "Upload a product image")}
                       </div>
@@ -747,16 +766,16 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                       <div>
                           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Select Creatives to Generate</label>
                           <div className="grid grid-cols-2 gap-3">
-                              {campaignAssets.map(asset => (
-                                  <label key={asset.type} className={`flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer ${selectedCampaignTypes.includes(asset.type) ? 'bg-purple-100 dark:bg-purple-900/50 border-purple-400 dark:border-purple-600' : 'bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'} border`}>
+                              {['social_ad', 'instagram_story', 'banner', 'twitter_post'].map(type => (
+                                  <label key={type} className={`flex items-center gap-3 p-3 rounded-md transition-colors cursor-pointer ${selectedCampaignTypes.includes(type as AssetType) ? 'bg-purple-100 dark:bg-purple-900/50 border-purple-400 dark:border-purple-600' : 'bg-slate-100 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600'} border`}>
                                       <input
                                           type="checkbox"
-                                          checked={selectedCampaignTypes.includes(asset.type)}
-                                          onChange={() => handleCampaignTypeToggle(asset.type)}
+                                          checked={selectedCampaignTypes.includes(type as AssetType)}
+                                          onChange={() => handleCampaignTypeToggle(type as AssetType)}
                                           className="h-4 w-4 rounded bg-slate-300 dark:bg-slate-600 border-slate-400 dark:border-slate-500 text-purple-600 focus:ring-purple-500"
                                           disabled={isLoading}
                                       />
-                                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{asset.label.split('(')[0]}</span>
+                                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200 capitalize">{type.replace('_', ' ')}</span>
                                   </label>
                               ))}
                           </div>
@@ -815,7 +834,11 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {filteredAssetGroups.map(({ original, variants }) => (
                   <div key={original.id} className="p-4 border border-slate-200 dark:border-slate-700/50 rounded-lg bg-white dark:bg-slate-800/20">
-                    <div className="group relative rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700/50 cursor-pointer aspect-[4/5] flex justify-center items-center" onClick={() => setPreviewingAsset(original)}>
+                    <div
+                        className="group relative rounded-lg bg-slate-100 dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700/50 cursor-pointer flex justify-center items-center overflow-hidden"
+                        style={{ aspectRatio: original.width && original.height ? `${original.width} / ${original.height}` : '1 / 1' }}
+                        onClick={() => setPreviewingAsset(original)}
+                    >
                         <AsyncImage assetId={original.id} alt="Generated creative" className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300"/>
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
                           <p className="text-sm font-semibold text-slate-100 drop-shadow-lg truncate">{original.prompt}</p>
@@ -833,7 +856,12 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                           <h5 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">A/B Test Variants</h5>
                           <div className="grid grid-cols-2 gap-4">
                             {variants.map(variant => (
-                              <div key={variant.id} className="group relative rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700/50 cursor-pointer aspect-square flex justify-center items-center" onClick={() => setPreviewingAsset(variant)}>
+                              <div
+                                  key={variant.id}
+                                  className="group relative rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden shadow-lg border border-slate-200 dark:border-slate-700/50 cursor-pointer flex justify-center items-center"
+                                  style={{ aspectRatio: variant.width && variant.height ? `${variant.width} / ${variant.height}` : '1 / 1' }}
+                                  onClick={() => setPreviewingAsset(variant)}
+                              >
                                 <span className="absolute top-1.5 left-1.5 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full z-10 font-semibold">{variant.variantLabel}</span>
                                 <AsyncImage assetId={variant.id} alt={`Variant creative: ${variant.prompt}`} className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300"/>
                               </div>
@@ -888,6 +916,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
             onUpdateTags={handleUpdateAssetTags}
             availableTags={allCreativeTags}
             onGenerateVariants={handleGenerateVariants}
+            onConvertToVideo={handleConvertToVideo}
         />
       )}
 
@@ -896,15 +925,15 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
             <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700">
                 <h3 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">Edit Creative</h3>
                 <div className="flex flex-col sm:flex-row gap-4 items-start">
-                    <div className="w-32 h-auto bg-slate-100 dark:bg-slate-700 rounded-md p-1 flex-shrink-0">
-                        <AsyncImage assetId={editingAsset.id} alt="creative to edit" className="w-full object-contain"/>
+                    <div className="w-32 h-32 bg-slate-100 dark:bg-slate-700 rounded-md p-1 flex-shrink-0">
+                        <AsyncImage assetId={editingAsset.id} alt="Creative to edit" className="w-full h-full object-contain"/>
                     </div>
                     <div className="flex-1">
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Describe your changes:</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Describe the changes you'd like to make:</p>
                         <textarea
                             value={editPrompt}
                             onChange={(e) => setEditPrompt(e.target.value)}
-                            placeholder="e.g., Make the background darker, change slogan"
+                            placeholder="e.g., change the background to blue, add '50% OFF'"
                             className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-shadow text-slate-900 dark:text-slate-100"
                             rows={3}
                             disabled={isLoading}
@@ -913,77 +942,11 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                 </div>
                 <div className="flex gap-4 mt-6 justify-end">
                     <button onClick={() => setEditingAsset(null)} disabled={isLoading} className="px-4 py-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors">Cancel</button>
-                    <button onClick={() => handleGenerate(editingAsset)} disabled={isLoading || !editPrompt.trim()} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">{isLoading ? "Saving..." : "Generate Edit"}</button>
+                    <button onClick={() => handleGenerate(editingAsset)} disabled={isLoading || !editPrompt.trim()} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-indigo-600/50 dark:disabled:bg-indigo-900/50 disabled:cursor-not-allowed">{isLoading ? "Generating..." : "Generate Edit"}</button>
                 </div>
             </div>
         </div>
        )}
-
-      {showSaveTemplateModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowSaveTemplateModal(false)}>
-            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Save as Custom Template</h2>
-                    <button onClick={() => setShowSaveTemplateModal(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
-                        <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
-                    </button>
-                </div>
-                <div className="mb-4">
-                    <label htmlFor="template-name" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Template Name
-                    </label>
-                    <input
-                    id="template-name"
-                    type="text"
-                    value={newTemplateName}
-                    onChange={(e) => setNewTemplateName(e.target.value)}
-                    placeholder="e.g., Weekly Product Showcase"
-                    className="w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100"
-                    />
-                </div>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 bg-slate-100 dark:bg-slate-700/50 p-3 rounded-md">
-                    <span className="font-semibold">Prompt to save:</span> "{prompt.substring(0, 100)}{prompt.length > 100 ? '...' : ''}"
-                </p>
-                <div className="flex justify-end gap-4">
-                    <button type="button" onClick={() => setShowSaveTemplateModal(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">
-                        Cancel
-                    </button>
-                    <button onClick={handleSaveCustomTemplate} disabled={!newTemplateName.trim()} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50">
-                        <BookmarkIcon className="w-5 h-5"/>
-                        Save Template
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {latestCampaignAssets && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setLatestCampaignAssets(null)}>
-            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Campaign Pack Generated!</h2>
-                    <button onClick={() => setLatestCampaignAssets(null)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
-                        <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
-                    </button>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-                    {latestCampaignAssets.map(asset => (
-                         <div key={asset.id} className="group relative aspect-square rounded-lg bg-slate-100 dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700/50 cursor-pointer" onClick={() => setPreviewingAsset(asset)}>
-                            <AsyncImage assetId={asset.id} alt="Generated campaign creative" className="w-full h-full object-contain p-2"/>
-                            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
-                                <p className="text-xs font-semibold text-white capitalize truncate">{asset.type.replace(/_/g, ' ')}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                 <div className="flex justify-end mt-6">
-                    <button onClick={() => setLatestCampaignAssets(null)} className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500">
-                        Done
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
     </div>
   );
 };

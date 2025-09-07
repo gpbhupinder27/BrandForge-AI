@@ -19,6 +19,21 @@ export const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+export const getImageDimensions = (dataUrl: string): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.width, height: img.height });
+    };
+    img.onerror = () => {
+      // Fallback in case of an error loading the data URL
+      resolve({ width: 1024, height: 1024 }); 
+    };
+    img.src = dataUrl;
+  });
+};
+
+
 interface ImageInput {
     data: string; // base64 string
     mimeType: string;
