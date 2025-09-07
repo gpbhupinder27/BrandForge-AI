@@ -50,12 +50,46 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
   const [isExporting, setIsExporting] = useState(false);
   const [viewingAssetId, setViewingAssetId] = useState<string | null>(null);
 
+  const logoAsset = brand.assets.find(asset => asset.type === 'logo');
+  const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
+  const typographyAsset = brand.assets.find(asset => asset.type === 'typography');
+
   useEffect(() => {
     // If the brand has no assets, it's new. Kick off the initial generation.
     if (brand.assets.length === 0) {
       generateInitialIdentity();
     }
   }, [brand.id]); // Rerun only when the brand itself changes
+
+   useEffect(() => {
+    if (typographyAsset?.typography) {
+        const headlineFontName = typographyAsset.typography.headlineFont.name;
+        const bodyFontName = typographyAsset.typography.bodyFont.name;
+
+        if (headlineFontName && bodyFontName) {
+            const fontFamilies = [headlineFontName, bodyFontName]
+                .filter((v, i, a) => a.indexOf(v) === i) // Unique fonts
+                .map(font => `${font.replace(/ /g, '+')}:wght@400;700`) // Request weights
+                .join('&family=');
+            
+            const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamilies}&display=swap`;
+
+            // Check if the link already exists
+            const existingLink = document.head.querySelector(`link[href="${fontUrl}"]`);
+            if (!existingLink) {
+                 // Remove old dynamic font links to prevent clutter
+                const oldLinks = document.head.querySelectorAll('link[data-dynamic-font]');
+                oldLinks.forEach(link => link.remove());
+                
+                const link = document.createElement('link');
+                link.href = fontUrl;
+                link.rel = 'stylesheet';
+                link.setAttribute('data-dynamic-font', 'true'); // Mark as dynamic
+                document.head.appendChild(link);
+            }
+        }
+    }
+  }, [typographyAsset]);
 
   const generateInitialIdentity = async () => {
     setIsInitializing(true);
@@ -150,8 +184,7 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
         setIsExporting(false);
     }
   };
-
-  const logoAsset = brand.assets.find(asset => asset.type === 'logo');
+  
   const assetToView = viewingAssetId ? brand.assets.find(a => a.id === viewingAssetId) : null;
 
   const renderContent = () => {
@@ -203,14 +236,75 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
                     <ArrowLeftIcon className="w-5 h-5" />
                     Back to Dashboard
                 </button>
-                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-6 p-6 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-lg">
-                    <div className="flex-1">
-                        <h2 className="text-4xl font-bold text-slate-900 dark:text-slate-50">{brand.name}</h2>
-                        <p className="text-slate-600 dark:text-slate-400 mt-2 max-w-2xl">{brand.description}</p>
+                 <div className="flex flex-col sm:flex-row items-stretch mb-8 gap-6 p-4 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl shadow-md">
+                    {/* Brand Info */}
+                    <div 
+                        className="flex items-center gap-4 flex-1 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                        onClick={() => setActiveTab('identity')}
+                        title="Go to Identity Studio"
+                    >
+                      {logoAsset && (
+                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shadow-lg flex-shrink-0">
+                          <AsyncImage assetId={logoAsset.id} alt="Brand Logo" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{brand.name}</h2>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-xl">{brand.description}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        {logoAsset && <div className="w-24 h-24 bg-slate-100 dark:bg-slate-700 rounded-lg p-1 shadow-lg"><AsyncImage assetId={logoAsset.id} alt="Brand Logo" className="w-full h-full object-contain" /></div>}
-                    </div>
+
+                    {/* Color Palette */}
+                    {paletteAsset?.palette && (
+                      <div className="sm:border-l border-slate-200 dark:border-slate-700/50 pt-4 sm:pt-0 border-t sm:border-t-0">
+                        <div 
+                          className="h-full p-2 sm:pl-6 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                          onClick={() => setActiveTab('identity')}
+                          title="Edit Color Palette"
+                        >
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Color Palette</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {paletteAsset.palette.colors.map((color, index) => (
+                              <div
+                                key={index}
+                                className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-600 shadow-sm"
+                                style={{ backgroundColor: color.hex }}
+                                title={`${color.name} (${color.hex})`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Typography */}
+                    {typographyAsset?.typography && (
+                      <div className="sm:border-l border-slate-200 dark:border-slate-700/50 pt-4 sm:pt-0 border-t sm:border-t-0">
+                        <div 
+                          className="h-full p-2 sm:pl-6 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                          onClick={() => setActiveTab('identity')}
+                          title="Edit Typography"
+                        >
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Typography</h4>
+                          <div className="space-y-1">
+                              <p 
+                                  className="text-xl font-bold text-slate-800 dark:text-slate-200 truncate" 
+                                  title={typographyAsset.typography.headlineFont.name}
+                                  style={{ fontFamily: `'${typographyAsset.typography.headlineFont.name}', sans-serif` }}
+                              >
+                                  {typographyAsset.typography.headlineFont.name}
+                              </p>
+                              <p 
+                                  className="text-sm text-slate-600 dark:text-slate-400 truncate" 
+                                  title={typographyAsset.typography.bodyFont.name}
+                                  style={{ fontFamily: `'${typographyAsset.typography.bodyFont.name}', sans-serif` }}
+                              >
+                                  {typographyAsset.typography.bodyFont.name}
+                              </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                 </div>
                  <div className="border-b border-slate-200 dark:border-slate-700 mb-8">
                     <nav className="-mb-px flex space-x-2">

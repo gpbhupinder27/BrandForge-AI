@@ -152,18 +152,24 @@ export const generatePromptSuggestions = async (
         : "The creative will be generated from scratch based on the prompt.";
 
     const paletteContext = palette
-        ? `The brand's color palette is described as "${palette.description}" and features colors like ${palette.colors.map(c => c.name).join(', ')}. The suggested prompts should align with this visual mood.`
-        : '';
+        ? `The brand's color palette is described as "${palette.description}" and includes colors like ${palette.colors.map(c => `${c.name} (${c.hex})`).join(', ')}. This visual identity is crucial.`
+        : 'No specific color palette is defined.';
 
     const prompt = `
-        You are an expert marketing strategist. A user is creating a "${creativeTypeLabel}" for a brand with the following identity:
-        - Brand Description: "${brandDescription}"
-        ${paletteContext}
+        You are an expert marketing and branding strategist. Your task is to generate 3 distinct and compelling prompt ideas for a "${creativeTypeLabel}". These prompts will be fed into an AI image generator.
 
-        Context for the creative:
+        **CRITICAL BRAND GUIDELINES (Adhere Strictly):**
+        1.  **Brand Essence:** The brand is described as: "${brandDescription}". Every prompt must reflect this core identity.
+        2.  **Visual Mood & Colors:** ${paletteContext} The prompts **must** suggest imagery, styles, and moods that are perfectly aligned with this color palette. For instance, if the palette is 'Coastal Sunset', prompts should suggest things like 'warm orange glow', 'serene beach at dusk', 'soft purple clouds'.
+
+        **Creative Context:**
         ${imageContext}
-        
-        Generate a list of 3 distinct and compelling prompt ideas for the user. Each prompt should be tailored to a different marketing goal (e.g., a sale, a new product announcement, building brand engagement). The prompts should be concise, creative, and ready for an AI image generator.
+
+        **Your Task:**
+        Generate a list of 3 creative prompt ideas. Each idea must:
+        - Align with a different marketing goal (e.g., announcing a sale, launching a new product, building community engagement).
+        - Be directly inspired by the Brand Essence and Visual Mood described above.
+        - Be a concise, powerful, and ready-to-use prompt for an AI image generator.
 
         Return the suggestions as a JSON array of objects, where each object has a "goal" and a "prompt".
     `;
@@ -200,20 +206,30 @@ export const generateThumbnailElementSuggestions = async (
     palette: ColorPalette | null
 ): Promise<string[]> => {
     
-    const brandContext = `The brand is about: "${brandDescription}".`;
-    const paletteContext = palette ? `The brand's color palette is described as "${palette.description}". The suggestions should complement these colors.` : '';
+    const paletteContext = palette
+        ? `The brand's color palette is described as "${palette.description}" and includes colors like ${palette.colors.map(c => `${c.name} (${c.hex})`).join(', ')}. This is a key part of their visual identity.`
+        : 'No specific color palette is defined.';
 
     const prompt = `
-        You are an expert YouTube thumbnail designer. A user is creating a thumbnail with the following attributes:
-        - Brand Identity: ${brandContext} ${paletteContext}
+        You are an expert YouTube thumbnail designer and branding consultant. Your task is to suggest 3-5 high-impact graphical elements to add to a thumbnail's base image prompt.
+
+        **CRITICAL BRAND GUIDELINES (Adhere Strictly):**
+        1.  **Brand Essence:** The brand is described as: "${brandDescription}". All suggestions must be appropriate for this brand.
+        2.  **Visual Mood & Colors:** ${paletteContext} The suggested elements **must** complement and enhance this specific visual mood and color scheme. For example, for a 'calm, natural' palette, suggest 'soft light leaks' or 'subtle dust motes', not 'neon explosions'.
+
+        **Thumbnail Context:**
         - Style: "${style}"
-        - Human Emotion to Convey: "${emotion}"
+        - Emotion to Convey: "${emotion}"
         - Overlay Text: "${overlayText || 'Not specified'}"
         - Base Image Concept: "${baseImagePrompt || imageDescription || 'Not specified'}"
 
-        Based on this full context, suggest 3-5 simple, high-impact graphical elements to add to the *base image prompt* to make the thumbnail more engaging and clickable. The suggestions should complement the brand identity, specified style, and emotion. For example, for 'Vibrant & Energetic' and 'Excited', you might suggest 'exploding stars' or 'dynamic speed lines'. For 'Dark & Moody' and 'Serious', you might suggest 'a subtle lens flare' or 'a gritty texture overlay'.
+        **Your Task:**
+        Based on the **full brand and thumbnail context**, suggest 3-5 simple, clickable graphical elements. These suggestions will be added to the AI image generation prompt. They should be short, descriptive strings.
 
-        Return the suggestions as a JSON array of short, descriptive strings.
+        - **Good examples for a 'tech' brand:** 'glowing circuit board lines', 'a holographic data overlay', 'subtle lens flare'.
+        - **Bad examples for a 'tech' brand:** 'hand-drawn doodles', 'rustic wood texture'.
+
+        Return the suggestions as a JSON array of strings.
     `;
     try {
         const schema = {

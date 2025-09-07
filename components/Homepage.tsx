@@ -31,12 +31,9 @@ const FeatureCard = ({ icon, title, description }: { icon: React.ReactNode, titl
 
 const Homepage: React.FC<HomepageProps> = ({ onGetStarted }) => {
   return (
-    <div className="animate-fade-in bg-white dark:bg-slate-900">
+    <div className="animate-fade-in bg-slate-50 dark:bg-slate-900">
       {/* Hero Section */}
       <section className="relative text-center pt-24 pb-28 sm:pt-32 sm:pb-36 overflow-hidden">
-        <div aria-hidden="true" className="absolute inset-0 -z-10">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-[150%] max-w-7xl max-h-7xl bg-[radial-gradient(ellipse_at_center,rgba(101,116,205,0.15),transparent_60%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(79,70,229,0.2),transparent_70%)]"></div>
-        </div>
         <div className="relative max-w-4xl mx-auto px-4 z-10">
             <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
             Build Your Brand in Minutes, <span className="text-indigo-500 dark:text-indigo-400">Not Weeks</span>
@@ -87,7 +84,7 @@ const Homepage: React.FC<HomepageProps> = ({ onGetStarted }) => {
       </section>
 
       {/* How It Works Section */}
-      <section className="py-16">
+      <section className="py-20 bg-slate-50 dark:bg-slate-900/50">
         <div className="max-w-6xl mx-auto px-4">
             <div className="text-center mb-16">
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100">A Simple, Powerful Workflow</h2>

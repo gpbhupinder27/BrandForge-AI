@@ -200,7 +200,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, setter: React.Dispatch<React.SetStateAction<File | null>>, inputRef: React.RefObject<HTMLInputElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    e.currentTarget.classList.remove('border-indigo-500');
+    e.currentTarget.classList.remove('border-indigo-500', 'dark:border-indigo-400');
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       if (file.type.startsWith('image/')) {
@@ -504,36 +504,38 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
     label: string,
     imageFile: File | null,
     setImageFile: React.Dispatch<React.SetStateAction<File | null>>,
-    inputRef: React.RefObject<HTMLInputElement>
+    inputRef: React.RefObject<HTMLInputElement>,
+    helpText: string
   ) => (
      <div>
         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{label}</label>
         {imageFile ? (
             <div className="relative group">
-                <img src={URL.createObjectURL(imageFile)} alt="Preview" className="w-full h-auto max-h-48 object-contain rounded-md border border-slate-300 dark:border-slate-600 p-1" />
+                <img src={URL.createObjectURL(imageFile)} alt="Preview" className="w-full h-auto max-h-48 object-contain rounded-md border border-slate-300 dark:border-slate-600 p-1 bg-white dark:bg-slate-700/50" />
                 <button
                     onClick={() => {
                         setImageFile(null);
                         if (inputRef.current) inputRef.current.value = "";
                     }}
-                    className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/75 transition-colors opacity-0 group-hover:opacity-100"
+                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors opacity-0 group-hover:opacity-100"
                     aria-label="Remove image"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    <XMarkIcon className="w-4 h-4" />
                 </button>
             </div>
         ) : (
             <div
                 onDrop={(e) => handleDrop(e, setImageFile, inputRef)}
                 onDragOver={handleDragOver}
-                onDragLeave={(e) => e.currentTarget.classList.remove('border-indigo-500')}
-                onDragEnter={(e) => e.currentTarget.classList.add('border-indigo-500')}
-                className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center cursor-pointer hover:border-indigo-500 transition-colors"
+                onDragLeave={(e) => e.currentTarget.classList.remove('border-indigo-500', 'dark:border-indigo-400')}
+                onDragEnter={(e) => e.currentTarget.classList.add('border-indigo-500', 'dark:border-indigo-400')}
+                className="border border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center cursor-pointer bg-slate-50 dark:bg-slate-900/40 hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors h-full flex flex-col justify-center items-center"
                 onClick={() => inputRef.current?.click()}
             >
                 <ImageIcon className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">Click to upload</span> or drag and drop
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">{helpText}</span>
+                    <span className="block text-xs">or drag and drop</span>
                 </p>
                 <input
                     type="file"
@@ -576,37 +578,41 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
             
             <div>
                 {activeCreativeTab === 'single' && (
-                     <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-4 animate-fade-in">
-                        <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-slate-100">Single Creative</h3>
+                     <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-6 animate-fade-in">
+                        <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Single Creative</h3>
                         
-                        <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                           <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><TemplateIcon className="w-5 h-5"/> Start with a Template</h4>
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                            <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 shrink-0">
+                                <TemplateIcon className="w-5 h-5"/>
+                                Start with a Template
+                            </h4>
                             <button 
                                 onClick={() => setIsCreativeTemplateModalOpen(true)} 
                                 disabled={isLoading}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 font-semibold bg-slate-100 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                                className="w-full sm:w-auto flex-shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold bg-white dark:bg-slate-700/50 text-slate-800 dark:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-300 dark:border-slate-600 shadow-sm"
                             >
-                                Browse Creative Templates
+                                Browse Templates
                             </button>
-                            {(brand.customTemplates || []).length > 0 && (
-                                <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700/50">
-                                    <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-2"><BookmarkIcon className="w-5 h-5"/> Your Custom Templates</h4>
-                                    <div className="space-y-2">
-                                        {brand.customTemplates?.map(template => (
-                                            <div key={template.id} className="group flex items-center justify-between p-3 bg-white dark:bg-slate-700/50 rounded-md shadow-sm border border-slate-200 dark:border-slate-700">
-                                                <button onClick={() => setPrompt(template.prompt)} className="flex-1 text-left">
-                                                    <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{template.name}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{template.prompt}</p>
-                                                </button>
-                                                <button onClick={() => handleDeleteCustomTemplate(template.id)} className="ml-2 p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
+
+                        {(brand.customTemplates || []).length > 0 && (
+                            <div>
+                                <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-2"><BookmarkIcon className="w-5 h-5"/> Your Custom Templates</h4>
+                                <div className="space-y-2">
+                                    {brand.customTemplates?.map(template => (
+                                        <div key={template.id} className="group flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/40 rounded-md border border-slate-200 dark:border-slate-700/50">
+                                            <button onClick={() => setPrompt(template.prompt)} className="flex-1 text-left">
+                                                <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{template.name}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{template.prompt}</p>
+                                            </button>
+                                            <button onClick={() => handleDeleteCustomTemplate(template.id)} className="ml-2 p-1.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div>
                         <div className="flex justify-between items-center mb-2">
@@ -661,7 +667,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                                     {creativeTypeOptions.map(opt => <option key={opt.type} value={opt.type}>{opt.label}</option>)}
                                 </select>
                             </div>
-                            {renderImageUpload("Upload Image (Optional)", productImage, setProductImage, fileInputRef)}
+                            {renderImageUpload("Upload Product Image (Optional)", productImage, setProductImage, fileInputRef, "Upload a product image")}
                         </div>
 
                         <div>
@@ -687,7 +693,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                     </div>
                 )}
                 {activeCreativeTab === 'campaign' && (
-                     <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-4 animate-fade-in">
+                     <div className="bg-white dark:bg-slate-800/50 p-6 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 space-y-6 animate-fade-in">
                         <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">One-Click Campaign</h3>
                         
                         <div>
@@ -726,7 +732,7 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand }) => {
                                 ))}
                             </div>
                         )}
-                        {renderImageUpload("Campaign Image (Optional)", campaignImage, setCampaignImage, campaignFileInputRef)}
+                        {renderImageUpload("Campaign Image (Optional)", campaignImage, setCampaignImage, campaignFileInputRef, "Upload a key campaign image")}
 
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Select Creatives to Generate</label>
