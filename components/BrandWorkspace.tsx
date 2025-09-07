@@ -109,7 +109,12 @@ const BrandWorkspace: React.FC<BrandWorkspaceProps> = ({ brand, onBack, onUpdate
         
         // Step 3: Generate Logo using Palette and Typography info
         const logoPrompt = `A modern, minimalist logo for a brand called '${brand.name}' which is described as "${brand.description}". The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements. Use a color palette inspired by these hex codes: ${paletteResult.colors.map(c => c.hex).join(', ')}. The brand's typography feels like: "${typographyResult.headlineFont.description}".`;
-        const logoParts = await generateWithNanoBanana(logoPrompt, [], 1024, 1024); // Generate a square logo
+        
+        const generationPromises = Array(3).fill(null).map(() => 
+            generateWithNanoBanana(logoPrompt, [], 1024, 1024)
+        );
+        const results = await Promise.all(generationPromises);
+        const logoParts = results.flat();
         
         const logoAssets: BrandAsset[] = [];
 

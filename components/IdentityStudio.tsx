@@ -397,26 +397,38 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
     setError(null);
 
     try {
-      let imageInputs = [];
+      let generatedParts;
+
+      const paletteInfo = paletteAsset?.palette ? ` Use a color palette inspired by these hex codes: ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}.` : '';
+      const typoInfo = typographyAsset?.typography ? ` The brand's typography feels like: "${typographyAsset.typography.headlineFont.description}".` : '';
+      
       if (baseAsset) {
+          // EDITING: Use nano-banana
           const baseImageUrl = await getImage(baseAsset.id);
           if (!baseImageUrl) throw new Error("Base image for editing not found.");
           const response = await fetch(baseImageUrl);
           const blob = await response.blob();
           const file = new File([blob], "edit_image.png", { type: blob.type });
           const base64 = await fileToBase64(file);
-          imageInputs.push({ data: base64, mimeType: file.type });
+          const imageInputs = [{ data: base64, mimeType: file.type }];
+          const finalPrompt = `Update the provided logo for a brand named "${brand.name}". User request: "${currentPrompt}". Keep the brand name clear. The logo MUST be on a plain, solid white background.`;
+          generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, 1024, 1024);
       } else if (referenceImage) {
+          // GENERATION with reference: Use nano-banana
           const base64 = await fileToBase64(referenceImage);
-          imageInputs.push({ data: base64, mimeType: referenceImage.type });
+          const imageInputs = [{ data: base64, mimeType: referenceImage.type }];
+          const referenceInfo = ` The user has provided a reference image; use it as strong visual inspiration for the logo's style, shape, and overall concept.`;
+          const finalPrompt = `Create a logo for a brand named "${brand.name}". User request: "${currentPrompt}".${paletteInfo}${typoInfo}${referenceInfo} The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements.`;
+          generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, 1024, 1024);
+      } else {
+          // PURE TEXT-TO-IMAGE GENERATION: Use Nano Banana
+          const finalPrompt = `Create a logo for a brand named "${brand.name}". User request: "${currentPrompt}".${paletteInfo}${typoInfo} The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements.`;
+          const generationPromises = Array(3).fill(null).map(() => 
+              generateWithNanoBanana(finalPrompt, [], 1024, 1024)
+          );
+          const results = await Promise.all(generationPromises);
+          generatedParts = results.flat();
       }
-      
-      const paletteInfo = paletteAsset?.palette ? ` Use a color palette inspired by these hex codes: ${paletteAsset.palette.colors.map(c => c.hex).join(', ')}.` : '';
-      const typoInfo = typographyAsset?.typography ? ` The brand's typography feels like: "${typographyAsset.typography.headlineFont.description}".` : '';
-      const referenceInfo = !baseAsset && referenceImage ? ` The user has provided a reference image; use it as strong visual inspiration for the logo's style, shape, and overall concept.` : '';
-      const finalPrompt = `Create a logo for a brand named "${brand.name}". User request: "${currentPrompt}".${paletteInfo}${typoInfo}${referenceInfo} The logo MUST be on a plain, solid white background. Do not add any shadows or other background elements.`;
-
-      const generatedParts = await generateWithNanoBanana(finalPrompt, imageInputs, 1024, 1024);
       
       const newAssets: BrandAsset[] = [];
       const existingLogos = brand.assets.filter(a => a.type === 'logo');
@@ -428,7 +440,7 @@ const IdentityStudio: React.FC<IdentityStudioProps> = ({ brand, onUpdateBrand })
             type: 'logo',
             prompt: currentPrompt,
             createdAt: new Date().toISOString(),
-            isPrimary: existingLogos.length === 0 && index === 0, // Make first logo primary if none exist
+            isPrimary: !baseAsset && existingLogos.length === 0 && index === 0, // Make first logo primary if none exist
           };
           const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
           await storeImage(asset.id, imageUrl);

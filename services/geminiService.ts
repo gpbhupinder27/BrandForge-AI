@@ -24,71 +24,63 @@ interface ImageInput {
     mimeType: string;
 }
 
-// Pre-defined base64 encoded strings for blank white PNGs of various aspect ratios.
-const BLANK_IMAGES = {
-    '1:1': 'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAQAAAAnOwcEAAAADklEQVR42mNkAANGCAUAACMAA2w/AMgAAAAASUVORK5CYII=',
-    '16:9': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAJCAQAAACRI2S5AAAADklEQVR42mNkAAJGCAUAACMAA2w/AMgAAAAASUVORK5CYII=',
-    '9:16': 'iVBORw0KGgoAAAANSUhEUgAAAAkAAAAQCAQAAABuQZ3IAAAADklEQVR42mNkAAJGCAUAACMAA2w/AMgAAAAASUVORK5CYII=',
-    '4:3': 'iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAQAAAAe/YwQAAAADklEQVR42mNkAAJGCAUAACMAA2w/AMgAAAAASUVORK5CYII=',
-    '3:4': 'iVBORw0KGgoAAAANSUhEUgAAAAMAAAAECAQAAAD//+iTAAAADklEQVR42mNkAAJGCAUAACMAA2w/AMgAAAAASUVORK5CYII=',
-    // Aspect ratio for 1200x628 banners
-    '1.91:1': 'iVBORw0KGgoAAAANSUhEUgAAAL8AAABkCAQAAACrs348AAAAF0lEQVR42mNkwA4w+I9WPywYgB82AwD3yQYg2e2E4gAAAABJRU5ErkJggg==',
-};
-
-/**
- * Finds the closest matching pre-defined blank image for a given width and height.
- * @param width The target width.
- * @param height The target height.
- * @returns An ImageInput object with base64 data, or null if no match is found.
- */
-const getBlankImageForAspectRatio = (width: number, height: number): ImageInput | null => {
-    const ratio = width / height;
-    let closestRatioKey: keyof typeof BLANK_IMAGES | null = null;
-    
-    // Using a small tolerance for float comparison
-    if (Math.abs(ratio - 1) < 0.01) closestRatioKey = '1:1';
-    else if (Math.abs(ratio - 16 / 9) < 0.01) closestRatioKey = '16:9';
-    else if (Math.abs(ratio - 9 / 16) < 0.01) closestRatioKey = '9:16';
-    else if (Math.abs(ratio - 4 / 3) < 0.01) closestRatioKey = '4:3';
-    else if (Math.abs(ratio - 3 / 4) < 0.01) closestRatioKey = '3:4';
-    else if (Math.abs(ratio - 1.91) < 0.02) closestRatioKey = '1.91:1';
-
-    if (closestRatioKey) {
-        return {
-            data: BLANK_IMAGES[closestRatioKey],
-            mimeType: 'image/png',
-        };
+const createBlankCanvas = (width: number, height: number): { data: string, mimeType: string } => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        // A solid color background is more reliable than a transparent one.
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
     }
-
-    console.warn(`No pre-defined blank image for aspect ratio ~${ratio.toFixed(2)} (${width}x${height}).`);
-    return null;
+    const dataUrl = canvas.toDataURL('image/png');
+    return {
+        data: dataUrl.split(',')[1],
+        mimeType: 'image/png'
+    };
 };
 
 
 export const generateWithNanoBanana = async (prompt: string, images: ImageInput[], width?: number, height?: number): Promise<GeneratedPart[]> => {
     try {
-        let allImages = [...images];
-        if (width && height) {
-            const blankImage = getBlankImageForAspectRatio(width, height);
-            if (blankImage) {
-                // Append the blank image as the last image. The model will adopt the aspect ratio
-                // of the last image provided in the prompt.
-                allImages.push(blankImage);
-            }
-        }
+        const textPart = { text: prompt };
 
-        const imageParts = allImages.map(img => ({
+        const imageParts = images.map(img => ({
             inlineData: {
                 data: img.data,
                 mimeType: img.mimeType
             }
         }));
+        
+        const finalParts: any[] = [textPart, ...imageParts];
 
-        const textPart = { text: prompt };
-
+        // For pure text-to-image generation, the model requires at least one input image.
+        // For image editing, we also append a blank image of the desired dimensions as the *last* image
+        // to enforce the output aspect ratio, as per the model's behavior.
+        if (width && height) {
+            const blankImage = createBlankCanvas(width, height);
+            finalParts.push({
+                inlineData: {
+                    data: blankImage.data,
+                    mimeType: blankImage.mimeType,
+                }
+            });
+        } else if (images.length === 0) {
+            // Fallback for pure text-to-image calls that don't specify dimensions.
+            // Use a default size that is likely to be accepted.
+            const blankImage = createBlankCanvas(1024, 1024);
+            finalParts.push({
+                inlineData: {
+                    data: blankImage.data,
+                    mimeType: blankImage.mimeType,
+                }
+            });
+        }
+        
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
-            contents: { parts: [...imageParts, textPart] },
+            contents: finalParts,
             config: {
                 responseModalities: [Modality.IMAGE, Modality.TEXT],
             },
