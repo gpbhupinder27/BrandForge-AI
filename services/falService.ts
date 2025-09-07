@@ -1,7 +1,8 @@
 interface FalImageToVideoParams {
     apiKey: string;
     imageUrl: string; // data URL
-    aspectRatio?: '16:9' | '1:1' | '9:16' | '3:4' | '4:3';
+    prompt: string;
+    aspectRatio?: 'auto' | '16:9' | '1:1' | '9:16';
 }
 
 interface FalImageToVideoResponse {
@@ -16,6 +17,7 @@ interface FalImageToVideoResponse {
 export const generateVideoFromImage = async ({
     apiKey,
     imageUrl,
+    prompt,
     aspectRatio = '16:9'
 }: FalImageToVideoParams): Promise<FalImageToVideoResponse> => {
     
@@ -34,8 +36,8 @@ export const generateVideoFromImage = async ({
             },
             body: JSON.stringify({
                 image_url: imageUrl,
+                prompt: prompt,
                 aspect_ratio: aspectRatio,
-                motion_bucket_id: 127,
                 seed: Math.floor(Math.random() * 100000),
             })
         });

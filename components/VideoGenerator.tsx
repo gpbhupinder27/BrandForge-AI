@@ -178,9 +178,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
         setError(null);
 
         try {
+            const videoPrompt = `A high-quality, cinematic video of the scene from the image. The camera should move slowly, creating a sense of realism and bringing the static image to life with subtle motion. The overall mood should match the user's prompt: "${imagePrompt}"`;
+
             const videoResponse = await generateVideoFromImage({
                 apiKey: falApiKey,
                 imageUrl: activeImage.url,
+                prompt: videoPrompt,
                 aspectRatio: '16:9'
             });
             
@@ -194,26 +197,33 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 const videoId = crypto.randomUUID();
                 await storeImage(videoId, base64data);
 
-                // Save the source image as a 'poster' asset (or another appropriate type)
-                const imageAsset: BrandAsset = {
-                    id: activeImage.id,
-                    type: 'poster', // Using poster as a generic image type for the source
-                    prompt: imagePrompt,
-                    createdAt: new Date().toISOString(),
-                };
+                const assetsToUpdate = [...brand.assets];
+
+                // Only add the source image as a new asset if it doesn't already exist.
+                const sourceAssetExists = brand.assets.some(asset => asset.id === activeImage.id);
+                if (!sourceAssetExists) {
+                    const imageAsset: BrandAsset = {
+                        id: activeImage.id,
+                        type: 'poster',
+                        prompt: imagePrompt,
+                        createdAt: new Date().toISOString(),
+                    };
+                    assetsToUpdate.push(imageAsset);
+                }
 
                 // Save the video as a 'video_ad' asset
                 const videoAsset: BrandAsset = {
                     id: videoId,
                     type: 'video_ad',
-                    prompt: `Video generated from image based on prompt: "${imagePrompt}"`,
+                    prompt: videoPrompt, // Use the more descriptive video prompt
                     createdAt: new Date().toISOString(),
                     parentId: activeImage.id,
                 };
+                assetsToUpdate.push(videoAsset);
 
                 onUpdateBrand({
                     ...brand,
-                    assets: [...brand.assets, imageAsset, videoAsset]
+                    assets: assetsToUpdate
                 });
                 
                 setActiveImage(null);
