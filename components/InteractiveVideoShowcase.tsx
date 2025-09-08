@@ -58,7 +58,7 @@ const InteractiveVideoShowcase = () => {
             {/* Left Side: Static Image */}
             <div className="relative aspect-video rounded-xl overflow-hidden shadow-lg">
                 <img 
-                    src="https://uelxlhdoa7kiamuy.public.blob.vercel-storage.com/hvideo.png" 
+                    src="https://uelxlhdoa7kiamuy.public.blob.vercel-storage.com/cupaimg.webp" 
                     alt="AI Generated Static Image" 
                     className="w-full h-full object-cover video-showcase-ken-burns"
                 />
@@ -77,7 +77,7 @@ const InteractiveVideoShowcase = () => {
                     loop 
                     muted 
                 >
-                  <source src="https://uelxlhdoa7kiamuy.public.blob.vercel-storage.com/hv.mp4" type="video/mp4" />
+                  <source src="https://uelxlhdoa7kiamuy.public.blob.vercel-storage.com/cupavideo.mp4" type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
                 <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/50 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm">
