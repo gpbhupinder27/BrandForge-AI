@@ -58,3 +58,20 @@ export interface GeneratedImagePart {
 }
 
 export type GeneratedPart = { text: string } | { inlineData: GeneratedImagePart };
+
+export interface TextOverlay {
+  id: string;
+  text: string;
+  fontFamily: string;
+  fontSize: number; // as a percentage of video height
+  color: string;
+  startTime: number;
+  endTime: number;
+  position: { x: number; y: number }; // Percentage from top-left
+}
+
+export interface AudioTrack {
+    assetId: string;
+    sourceUrl: string;
+    volume: number; // 0 to 1
+}
