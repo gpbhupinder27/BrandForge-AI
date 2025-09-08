@@ -68,14 +68,15 @@ export const generateWithNanoBanana = async (prompt: string, images: ImageInput[
             }
         }));
         
-        const finalParts: any[] = [textPart, ...imageParts];
+        // FIX: The contents parameter should be an object with a parts property which is an array.
+        const contents = { parts: [textPart, ...imageParts] };
 
         // For pure text-to-image generation, the model requires at least one input image.
         // For image editing, we also append a blank image of the desired dimensions as the *last* image
         // to enforce the output aspect ratio, as per the model's behavior.
         if (width && height) {
             const blankImage = createBlankCanvas(width, height);
-            finalParts.push({
+            contents.parts.push({
                 inlineData: {
                     data: blankImage.data,
                     mimeType: blankImage.mimeType,
@@ -85,7 +86,7 @@ export const generateWithNanoBanana = async (prompt: string, images: ImageInput[
             // Fallback for pure text-to-image calls that don't specify dimensions.
             // Use a default size that is likely to be accepted.
             const blankImage = createBlankCanvas(1024, 1024);
-            finalParts.push({
+            contents.parts.push({
                 inlineData: {
                     data: blankImage.data,
                     mimeType: blankImage.mimeType,
@@ -95,7 +96,7 @@ export const generateWithNanoBanana = async (prompt: string, images: ImageInput[
         
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
-            contents: finalParts,
+            contents: contents,
             config: {
                 responseModalities: [Modality.IMAGE, Modality.TEXT],
             },
@@ -123,8 +124,7 @@ export const generateStructuredContent = async <T>(prompt: string, schema: any):
             },
         });
 
-        // Fix: Access response.text directly
-        const jsonString = response.text.trim();
+        const jsonString = response.text;
         const cleanedJsonString = jsonString.replace(/^```json\s*|```$/g, '');
         return JSON.parse(cleanedJsonString) as T;
 
@@ -166,7 +166,6 @@ export const describeImage = async (imageBase64: string, mimeType: string): Prom
             contents: { parts: [imagePart, textPart] },
         });
 
-        // Fix: Access response.text directly
         return response.text;
     } catch (error) {
         console.error("Error describing image with Gemini API:", error);

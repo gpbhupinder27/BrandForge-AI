@@ -101,7 +101,6 @@ const AssetLibrary: React.FC<AssetLibraryProps> = ({ brand, onSelectAsset, onExp
         assets.sort((a, b) => {
             const dateA = new Date(a.createdAt).getTime();
             const dateB = new Date(b.createdAt).getTime();
-            // FIX: Corrected typo from `b` to `dateB` for proper date comparison.
             return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
         });
         return assets;

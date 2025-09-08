@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getImage as getVideo } from '../services/imageDb';
 import Loader from './Loader';
-import VideoPlayer from './VideoPlayer';
 
 interface AsyncVideoProps extends Omit<React.VideoHTMLAttributes<HTMLVideoElement>, 'src'> {
   assetId: string;
@@ -50,8 +49,8 @@ const AsyncVideo: React.FC<AsyncVideoProps> = ({ assetId, className, ...props })
             </div>
         );
     }
-
-    return <VideoPlayer src={videoUrl} className={className} {...props} />;
+    
+    return <video src={videoUrl} className={className} {...props} />;
 };
 
 export default AsyncVideo;
