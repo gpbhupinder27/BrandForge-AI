@@ -105,23 +105,37 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
     };
 
     const handleDelete = async () => {
-        if (window.confirm(`Are you sure you want to permanently delete this ${ASSET_TYPE_LABELS[asset.type]}? This will also delete any associated variants and cannot be undone.`)) {
+        if (window.confirm(`Are you sure you want to permanently delete this ${ASSET_TYPE_LABELS[asset.type]}? This will also delete any associated variants or generated videos and cannot be undone.`)) {
             try {
-                const variantIds = brand.assets
-                    .filter(a => a.parentId === asset.id)
-                    .map(a => a.id);
-                
-                const idsToDelete = [asset.id, ...variantIds];
+                const allAssets = brand.assets;
+                const idsToDelete = new Set<string>();
+                const queue = [asset.id]; // Start with the current asset
+                idsToDelete.add(asset.id);
 
-                const updatedAssets = brand.assets.filter(a => !idsToDelete.includes(a.id));
+                // Traverse the dependency tree to find all descendants
+                while (queue.length > 0) {
+                    const currentId = queue.shift()!;
+                    const children = allAssets.filter(a => a.parentId === currentId);
+                    for (const child of children) {
+                        if (!idsToDelete.has(child.id)) {
+                            idsToDelete.add(child.id);
+                            queue.push(child.id);
+                        }
+                    }
+                }
+
+                const idsToDeleteArray = Array.from(idsToDelete);
+                const updatedAssets = allAssets.filter(a => !idsToDelete.has(a.id));
+                
                 onUpdateBrand({ ...brand, assets: updatedAssets });
 
-                await deleteImages(idsToDelete);
+                // Asynchronously delete from IndexedDB
+                await deleteImages(idsToDeleteArray);
 
-                onBack();
+                onBack(); // Go back to the library view
             } catch (err) {
                 console.error("Failed to delete asset:", err);
-                setError(err instanceof Error ? err.message : "Could not delete asset from database.");
+                setError(err instanceof Error ? err.message : "Could not delete asset from the database.");
             }
         }
     };

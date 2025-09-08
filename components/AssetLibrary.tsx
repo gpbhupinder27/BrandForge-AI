@@ -105,16 +105,30 @@ const AssetLibrary: React.FC<AssetLibraryProps> = ({ brand, onUpdateBrand, onSel
 
         if (window.confirm(`Are you sure you want to permanently delete this ${ASSET_TYPE_LABELS[assetToDelete.type]}? This will also delete any associated variants or generated videos and cannot be undone.`)) {
             try {
-                const dependentAssetIds = brand.assets
-                    .filter(a => a.parentId === assetId)
-                    .map(a => a.id);
-                
-                const idsToDelete = [assetId, ...dependentAssetIds];
+                const allAssets = brand.assets;
+                const idsToDelete = new Set<string>();
+                const queue = [assetId]; // Start with the asset to delete
+                idsToDelete.add(assetId);
 
-                const updatedAssets = brand.assets.filter(a => !idsToDelete.includes(a.id));
+                // Traverse the dependency tree to find all descendants
+                while (queue.length > 0) {
+                    const currentId = queue.shift()!;
+                    const children = allAssets.filter(a => a.parentId === currentId);
+                    for (const child of children) {
+                        if (!idsToDelete.has(child.id)) {
+                            idsToDelete.add(child.id);
+                            queue.push(child.id);
+                        }
+                    }
+                }
+                
+                const idsToDeleteArray = Array.from(idsToDelete);
+                const updatedAssets = allAssets.filter(a => !idsToDelete.has(a.id));
+                
                 onUpdateBrand({ ...brand, assets: updatedAssets });
 
-                await deleteImages(idsToDelete);
+                // Asynchronously delete from IndexedDB
+                await deleteImages(idsToDeleteArray);
 
             } catch (err) {
                 console.error("Failed to delete asset:", err);
