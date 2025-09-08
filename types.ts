@@ -1,7 +1,7 @@
 // Fix: Removed incorrect import of 'GeneratedPart' to fix a circular dependency.
 // The 'GeneratedPart' type is defined and exported from this file.
 
-export type AssetType = 'logo' | 'palette' | 'typography' | 'poster' | 'banner' | 'social_ad' | 'instagram_story' | 'twitter_post' | 'youtube_thumbnail' | 'video_ad';
+export type AssetType = 'logo' | 'palette' | 'typography' | 'poster' | 'banner' | 'social_ad' | 'instagram_story' | 'twitter_post' | 'youtube_thumbnail' | 'video_ad' | 'video_source_image';
 
 export interface ColorInfo {
   hex: string;

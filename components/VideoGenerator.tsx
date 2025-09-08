@@ -205,7 +205,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 if (!sourceAssetExists) {
                     const imageAsset: BrandAsset = {
                         id: activeImage.id,
-                        type: 'poster',
+                        type: 'video_source_image',
                         prompt: imagePrompt,
                         createdAt: new Date().toISOString(),
                     };
@@ -219,11 +219,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                     createdAt: new Date().toISOString(),
                     parentId: activeImage.id,
                 };
-                assetsToUpdate.push(videoAsset);
-
+                
                 onUpdateBrand({
                     ...brand,
-                    assets: assetsToUpdate
+                    assets: [...assetsToUpdate, videoAsset]
                 });
                 
                 setGeneratedVideo({ id: videoId, url: base64data });
@@ -416,8 +415,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                    {isLoadingImage && !activeImage ? <Loader message="Generating image..."/> : activeImage ? (
                         <div className="w-full space-y-4">
                             <div className="relative">
-                                <AsyncImage 
-                                    assetId={activeImage.id} 
+                                <img 
+                                    src={activeImage.url} 
                                     alt="Generated image" 
                                     className={`w-full rounded-md object-contain transition-opacity ${isLoadingVideo ? 'opacity-30' : ''}`}
                                 />

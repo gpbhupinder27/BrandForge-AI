@@ -23,6 +23,7 @@ interface AssetDetailViewProps {
   onRequestVideoConversion?: (assetId: string) => void;
 }
 
+// FIX: Add 'video_source_image' to ASSET_TYPE_LABELS to satisfy the Record<AssetType, string> type.
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
     logo: 'Logo',
     palette: 'Color Palette',
@@ -34,6 +35,7 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
     twitter_post: 'Twitter Post',
     youtube_thumbnail: 'YouTube Thumbnail',
     video_ad: 'Video Ad',
+    video_source_image: 'Video Source Image',
 };
 
 const QUICK_EDITS = [
