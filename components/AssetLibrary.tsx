@@ -7,6 +7,7 @@ import XMarkIcon from './icons/XMarkIcon';
 import ImageIcon from './icons/ImageIcon';
 import ExportIcon from './icons/ExportIcon';
 import PlayIcon from './icons/PlayIcon';
+import { deleteImages } from '../services/imageDb';
 
 interface AssetLibraryProps {
   brand: Brand;
@@ -30,7 +31,7 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
 };
 
 
-const AssetCard: React.FC<{ asset: BrandAsset; onClick: () => void; }> = ({ asset, onClick }) => {
+const AssetCard: React.FC<{ asset: BrandAsset; onClick: () => void; onDelete: (e: React.MouseEvent) => void; }> = ({ asset, onClick, onDelete }) => {
     const renderContent = () => {
         if (asset.type === 'palette' && asset.palette) {
             return (
@@ -78,17 +79,49 @@ const AssetCard: React.FC<{ asset: BrandAsset; onClick: () => void; }> = ({ asse
                 <h3 className="text-sm font-semibold text-white truncate drop-shadow-md">{ASSET_TYPE_LABELS[asset.type]}</h3>
                 <p className="text-xs text-slate-300 drop-shadow-md">{new Date(asset.createdAt).toLocaleDateString()}</p>
             </div>
+             <button
+                onClick={onDelete}
+                className="absolute top-2 right-2 z-10 p-1.5 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                aria-label={`Delete ${ASSET_TYPE_LABELS[asset.type]}`}
+                title="Delete Asset"
+            >
+                <XMarkIcon className="w-4 h-4" />
+            </button>
         </div>
     );
 };
 
-const AssetLibrary: React.FC<AssetLibraryProps> = ({ brand, onSelectAsset, onExportBrand, isExporting }) => {
+const AssetLibrary: React.FC<AssetLibraryProps> = ({ brand, onUpdateBrand, onSelectAsset, onExportBrand, isExporting }) => {
     const [typeFilters, setTypeFilters] = useState<AssetType[]>([]);
     const [tagFilters, setTagFilters] = useState<string[]>([]);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
     const allAssetTypes = useMemo(() => [...new Set(brand.assets.map(a => a.type))].sort((a,b) => ASSET_TYPE_LABELS[a].localeCompare(ASSET_TYPE_LABELS[b])), [brand.assets]);
     const allTags = useMemo(() => [...new Set(brand.assets.flatMap(a => a.tags || []))].sort(), [brand.assets]);
+    
+    const handleDeleteAsset = async (assetId: string) => {
+        const assetToDelete = brand.assets.find(a => a.id === assetId);
+        if (!assetToDelete) return;
+
+        if (window.confirm(`Are you sure you want to permanently delete this ${ASSET_TYPE_LABELS[assetToDelete.type]}? This will also delete any associated variants or generated videos and cannot be undone.`)) {
+            try {
+                const dependentAssetIds = brand.assets
+                    .filter(a => a.parentId === assetId)
+                    .map(a => a.id);
+                
+                const idsToDelete = [assetId, ...dependentAssetIds];
+
+                const updatedAssets = brand.assets.filter(a => !idsToDelete.includes(a.id));
+                onUpdateBrand({ ...brand, assets: updatedAssets });
+
+                await deleteImages(idsToDelete);
+
+            } catch (err) {
+                console.error("Failed to delete asset:", err);
+                // You could add an error state here to display to the user
+            }
+        }
+    };
 
     const filteredAndSortedAssets = useMemo(() => {
         let assets = [...brand.assets];
@@ -152,7 +185,15 @@ const AssetLibrary: React.FC<AssetLibraryProps> = ({ brand, onSelectAsset, onExp
             {filteredAndSortedAssets.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {filteredAndSortedAssets.map(asset => (
-                        <AssetCard key={asset.id} asset={asset} onClick={() => onSelectAsset(asset.id)} />
+                       <AssetCard 
+                            key={asset.id} 
+                            asset={asset} 
+                            onClick={() => onSelectAsset(asset.id)} 
+                            onDelete={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAsset(asset.id);
+                            }} 
+                        />
                     ))}
                 </div>
             ) : (
