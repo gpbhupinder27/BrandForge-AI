@@ -28,6 +28,52 @@
       .animate-bg-pan {
         animation: bg-pan 15s ease infinite;
       }
+
+      /* New styles for homepage hero showcase */
+      .hero-showcase-container {
+        -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+        mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+      }
+      .hero-showcase-reel {
+        display: flex;
+        width: calc(2 * 25rem * 8); /* (2 * item_width * number_of_items) */
+        animation: scroll 60s linear infinite;
+      }
+      .hero-showcase-item {
+        width: 25rem;
+        flex-shrink: 0;
+        height: auto;
+        padding: 0 0.5rem;
+        aspect-ratio: 16/9;
+        object-fit: cover;
+        border-radius: 1rem;
+      }
+      @keyframes scroll {
+        0% {
+          transform: translateX(0);
+        }
+        100% {
+          transform: translateX(calc(-25rem * 8)); /* (-item_width * number_of_items) */
+        }
+      }
+      
+      .video-showcase-ken-burns {
+        animation: kenburns 15s ease-out infinite;
+        transform-origin: center center;
+      }
+
+      @keyframes kenburns {
+        0% {
+          transform: scale(1) translate(0, 0);
+        }
+        50% {
+          transform: scale(1.1) translate(-2%, 2%);
+        }
+        100% {
+          transform: scale(1) translate(0, 0);
+        }
+      }
+
     </style>
   <script type="importmap">
 {
