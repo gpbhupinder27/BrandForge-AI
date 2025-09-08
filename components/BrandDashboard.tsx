@@ -6,6 +6,7 @@ import CreateBrandModal from './CreateBrandModal';
 import AsyncImage from './AsyncImage';
 import ChevronRightIcon from './icons/ChevronRightIcon';
 import RectangleStackIcon from './icons/RectangleStackIcon';
+import TrashIcon from './icons/TrashIcon';
 
 interface BrandDashboardProps {
   brands: Brand[];
@@ -44,9 +45,20 @@ const BrandDashboard: React.FC<BrandDashboardProps> = ({ brands, onSelectBrand, 
               return (
                 <div
                   key={brand.id}
-                  className="bg-white dark:bg-slate-800/50 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-indigo-500 dark:hover:border-indigo-400 group"
+                  className="bg-white dark:bg-slate-800/50 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700/50 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:border-indigo-500 dark:hover:border-indigo-400 group relative"
                   onClick={() => onSelectBrand(brand.id)}
                 >
+                  <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteBrand(brand.id);
+                    }}
+                    className="absolute top-4 right-4 z-10 p-1.5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-full text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 dark:hover:bg-red-800 hover:text-red-600 dark:hover:text-red-400"
+                    aria-label={`Delete ${brand.name} brand`}
+                    title="Delete Brand"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
                   <div className="p-6 cursor-pointer">
                     <div className="flex justify-between items-start">
                       <div className="flex-1 pr-4">
