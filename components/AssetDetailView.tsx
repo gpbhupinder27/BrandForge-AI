@@ -109,10 +109,10 @@ const AssetDetailView: React.FC<AssetDetailViewProps> = ({ asset, brand, onBack,
             try {
                 const allAssets = brand.assets;
                 const idsToDelete = new Set<string>();
-                const queue = [asset.id]; // Start with the current asset
+                const queue = [asset.id]; // Start with the asset to delete
                 idsToDelete.add(asset.id);
 
-                // Traverse the dependency tree to find all descendants
+                // Traverse the dependency tree to find all descendants (BFS)
                 while (queue.length > 0) {
                     const currentId = queue.shift()!;
                     const children = allAssets.filter(a => a.parentId === currentId);

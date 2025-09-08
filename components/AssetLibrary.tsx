@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Brand, BrandAsset, AssetType } from '../types';
 import AsyncImage from './AsyncImage';
 import FilterIcon from './icons/FilterIcon';
@@ -7,7 +7,10 @@ import XMarkIcon from './icons/XMarkIcon';
 import ImageIcon from './icons/ImageIcon';
 import ExportIcon from './icons/ExportIcon';
 import PlayIcon from './icons/PlayIcon';
-import { deleteImages } from '../services/imageDb';
+import { deleteImages, getImage } from '../services/imageDb';
+import { generateVideoThumbnail } from '../services/videoUtils';
+import AsyncVideo from './AsyncVideo';
+import Loader from './Loader';
 
 interface AssetLibraryProps {
   brand: Brand;
@@ -32,7 +35,42 @@ const ASSET_TYPE_LABELS: Record<AssetType, string> = {
 
 
 const AssetCard: React.FC<{ asset: BrandAsset; onClick: () => void; onDelete: (e: React.MouseEvent) => void; }> = ({ asset, onClick, onDelete }) => {
+    const [isHovering, setIsHovering] = useState(false);
+    const [thumbnail, setThumbnail] = useState<string | null>(null);
+
+    useEffect(() => {
+        let isActive = true;
+        if (asset.type === 'video_ad') {
+            const getThumb = async () => {
+                setThumbnail(null); // Reset for new asset
+                try {
+                    const videoUrl = await getImage(asset.id);
+                    if (videoUrl && isActive) {
+                        const thumbUrl = await generateVideoThumbnail(videoUrl);
+                        if (isActive) setThumbnail(thumbUrl);
+                    }
+                } catch(e) {
+                    console.error(`Failed to generate thumbnail for ${asset.id}`, e);
+                }
+            };
+            getThumb();
+        }
+        return () => { isActive = false; };
+    }, [asset.id, asset.type]);
+
     const renderContent = () => {
+        if (asset.type === 'video_ad') {
+             return isHovering ? (
+                <AsyncVideo assetId={asset.id} className="w-full h-full object-cover" autoPlay loop muted />
+            ) : (
+                <>
+                    {thumbnail ? <img src={thumbnail} className="w-full h-full object-cover" alt="Video thumbnail"/> : <div className="w-full h-full flex items-center justify-center"><Loader message="" subMessage=""/></div>}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 group-hover:opacity-0 transition-opacity">
+                        <PlayIcon className="w-12 h-12 text-white/80" />
+                    </div>
+                </>
+            );
+        }
         if (asset.type === 'palette' && asset.palette) {
             return (
                 <div className="flex flex-col h-full w-full">
@@ -58,22 +96,12 @@ const AssetCard: React.FC<{ asset: BrandAsset; onClick: () => void; onDelete: (e
                 </div>
             );
         }
-        if (asset.type === 'video_ad' && asset.parentId) {
-             return (
-                <>
-                    <AsyncImage assetId={asset.parentId} alt={asset.prompt} className="w-full h-full object-contain p-2" />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <PlayIcon className="w-12 h-12 text-white/80" />
-                    </div>
-                </>
-            );
-        }
         // For logos, creatives, and other image-based assets
         return <AsyncImage assetId={asset.id} alt={asset.prompt} className="w-full h-full object-contain p-2" />;
     };
 
     return (
-        <div onClick={onClick} className="group relative aspect-square rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50 shadow-md border border-slate-200 dark:border-slate-700/50 cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-indigo-500 dark:hover:border-indigo-400">
+        <div onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)} onClick={onClick} className="group relative aspect-square rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700/50 shadow-md border border-slate-200 dark:border-slate-700/50 cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-indigo-500 dark:hover:border-indigo-400">
             {renderContent()}
             <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                 <h3 className="text-sm font-semibold text-white truncate drop-shadow-md">{ASSET_TYPE_LABELS[asset.type]}</h3>
@@ -110,7 +138,7 @@ const AssetLibrary: React.FC<AssetLibraryProps> = ({ brand, onUpdateBrand, onSel
                 const queue = [assetId]; // Start with the asset to delete
                 idsToDelete.add(assetId);
 
-                // Traverse the dependency tree to find all descendants
+                // Traverse the dependency tree to find all descendants (BFS)
                 while (queue.length > 0) {
                     const currentId = queue.shift()!;
                     const children = allAssets.filter(a => a.parentId === currentId);

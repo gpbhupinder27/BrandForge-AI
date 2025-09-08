@@ -4,7 +4,7 @@ import BrandDashboard from './components/BrandDashboard';
 import { Brand } from './types';
 import useLocalStorage from './hooks/useLocalStorage';
 import BrandWorkspace from './components/BrandWorkspace';
-import { initDB } from './services/imageDb';
+import { initDB, deleteImages } from './services/imageDb';
 import Loader from './components/Loader';
 import Homepage from './components/Homepage';
 
@@ -52,11 +52,24 @@ const App: React.FC = () => {
     setShowHomepageOverride(false);
   };
 
-  const handleDeleteBrand = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this brand and all its assets?')) {
-      setBrands(brands.filter(brand => brand.id !== id));
-      if (selectedBrandId === id) {
-        setSelectedBrandId(null);
+  const handleDeleteBrand = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this brand and all its assets? This action cannot be undone.')) {
+      try {
+        const brandToDelete = brands.find(brand => brand.id === id);
+        if (brandToDelete) {
+          const assetIdsToDelete = brandToDelete.assets.map(asset => asset.id);
+          if (assetIdsToDelete.length > 0) {
+            await deleteImages(assetIdsToDelete);
+          }
+        }
+
+        setBrands(brands.filter(brand => brand.id !== id));
+        if (selectedBrandId === id) {
+          setSelectedBrandId(null);
+        }
+      } catch (error) {
+        console.error("Failed to delete brand and its assets:", error);
+        alert("There was an error deleting the brand. Please try again.");
       }
     }
   };
