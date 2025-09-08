@@ -56,7 +56,7 @@ const InteractiveVideoShowcase = () => {
             onMouseLeave={handleMouseLeave}
         >
             {/* Left Side: Static Image */}
-            <div className="relative aspect-video rounded-xl overflow-hidden shadow-lg">
+            <div className="relative aspect-square rounded-xl overflow-hidden shadow-lg">
                 <img 
                     src="https://uelxlhdoa7kiamuy.public.blob.vercel-storage.com/cupaimg.webp" 
                     alt="AI Generated Static Image" 
@@ -69,7 +69,7 @@ const InteractiveVideoShowcase = () => {
             </div>
 
             {/* Right Side: Video */}
-            <div className="relative aspect-video rounded-xl overflow-hidden shadow-lg">
+            <div className="relative aspect-square rounded-xl overflow-hidden shadow-lg">
                 <video 
                     ref={videoRef}
                     className="w-full h-full object-cover" 
