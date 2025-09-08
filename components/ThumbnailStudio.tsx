@@ -42,114 +42,38 @@ const thumbnailStyles = ['Default', 'Vibrant & Energetic', 'Minimal & Clean', 'D
 const compositionRules = ['Default', 'Rule of Thirds: Subject Left', 'Rule of Thirds: Subject Right', 'Center-Focused'];
 const humanEmotions = ['None', 'Excited', 'Shocked / Surprised', 'Happy', 'Serious / Focused', 'Curious'];
 
-const thumbnailTemplates = [
+const thumbnailTemplateCategories = [
     {
-        name: 'Gaming Review',
-        icon: <GamingIcon className="w-8 h-8" />,
-        prompt: "A dynamic and exciting thumbnail for a video game review. Feature a high-action screenshot from the game.",
-        overlayText: "IS IT WORTH IT?!",
-        style: 'Vibrant & Energetic',
-        emotion: 'Excited',
-        composition: 'Rule of Thirds: Subject Right',
+        name: 'Entertainment & Reviews',
+        templates: [
+            { name: 'Gaming Review', icon: <GamingIcon className="w-8 h-8" />, prompt: "A dynamic and exciting thumbnail for a video game review. Feature a high-action screenshot from the game.", overlayText: "IS IT WORTH IT?!", style: 'Vibrant & Energetic', emotion: 'Excited', composition: 'Rule of Thirds: Subject Right' },
+            { name: 'Tech Unboxing', icon: <TechIcon className="w-8 h-8" />, prompt: "A clean, modern product shot of a new tech gadget on a minimalist background.", overlayText: "NEW GADGET UNBOXED!", style: 'Minimal & Clean', emotion: 'Curious', composition: 'Center-Focused' },
+            { name: 'Movie Review', icon: <MovieIcon className="w-8 h-8" />, prompt: 'A cinematic composition featuring elements from a popular movie, with a dark and moody atmosphere and dramatic lighting.', overlayText: 'THE ENDING EXPLAINED', style: 'Cinematic', emotion: 'Curious', composition: 'Rule of Thirds: Subject Right' },
+            { name: 'Reaction Video', icon: <VlogIcon className="w-8 h-8" />, prompt: "A thumbnail with a split screen: one side showing a piece of content (like a movie poster or video clip), the other side showing a person with an expressive, shocked, or laughing face.", overlayText: "MY HONEST REACTION", style: 'Vibrant & Energetic', emotion: 'Shocked / Surprised', composition: 'Default' },
+            { name: 'Top 5/10 List', icon: <TemplateIcon className="w-8 h-8" />, prompt: "A bold, number-focused thumbnail. Prominently display a large number (e.g., 'TOP 10') with intriguing images of the list items in the background.", overlayText: "TOP 10 BEST...", style: 'Vibrant & Energetic', emotion: 'Excited', composition: 'Center-Focused' },
+        ],
     },
     {
-        name: 'Tech Unboxing',
-        icon: <TechIcon className="w-8 h-8" />,
-        prompt: "A clean, modern product shot of a new tech gadget on a minimalist background.",
-        overlayText: "NEW GADGET UNBOXED!",
-        style: 'Minimal & Clean',
-        emotion: 'Curious',
-        composition: 'Center-Focused',
+        name: 'Lifestyle & Education',
+        templates: [
+            { name: 'Cooking Tutorial', icon: <CookingIcon className="w-8 h-8" />, prompt: "A delicious, vibrant, close-up shot of the finished dish, beautifully plated on a rustic wooden table.", overlayText: "EASY 10-MINUTE RECIPE", style: 'Vibrant & Energetic', emotion: 'Happy', composition: 'Center-Focused' },
+            { name: 'Fitness Challenge', icon: <FitnessIcon className="w-8 h-8" />, prompt: "An energetic person in mid-workout, looking determined, with a blurred gym background.", overlayText: "30 DAY CHALLENGE", style: 'Dark & Moody', emotion: 'Serious / Focused', composition: 'Rule of Thirds: Subject Left' },
+            { name: 'Travel Vlog', icon: <TravelIcon className="w-8 h-8" />, prompt: "A breathtaking landscape view of a famous travel destination with a person looking out over the scene.", overlayText: "WE WENT HERE!", style: 'Cinematic', emotion: 'Shocked / Surprised', composition: 'Rule of Thirds: Subject Left' },
+            { name: 'DIY Tutorial', icon: <DIYIcon className="w-8 h-8" />, prompt: "A person's hands working on a craft project on a clean, well-lit workbench, with tools neatly arranged.", overlayText: 'DIY PROJECT: STEP-BY-STEP', style: 'Minimal & Clean', emotion: 'Serious / Focused', composition: 'Center-Focused' },
+            { name: 'Productivity Hack', icon: <ProductivityIcon className="w-8 h-8" />, prompt: 'A minimalist desk setup with a laptop, notebook, and a single plant. A stylized brain graphic with glowing lines.', overlayText: '5 HACKS TO 10X YOUR FOCUS', style: 'Vibrant & Energetic', emotion: 'Serious / Focused', composition: 'Center-Focused' },
+            { name: 'Personal Vlog', icon: <VlogIcon className="w-8 h-8" />, prompt: 'A close-up, friendly portrait of a person talking directly to the camera, with a slightly blurred background of their room.', overlayText: 'MY WEEKLY UPDATE', style: 'Default', emotion: 'Happy', composition: 'Center-Focused' },
+            { name: 'Educational Deep Dive', icon: <ProductivityIcon className="w-8 h-8" />, prompt: "A more serious, informative thumbnail. Use clean text, graphs, or charts alongside a professional headshot to convey expertise.", overlayText: 'THE SCIENCE OF...', style: 'Minimal & Clean', emotion: 'Serious / Focused', composition: 'Default' },
+        ],
     },
     {
-        name: 'Cooking Tutorial',
-        icon: <CookingIcon className="w-8 h-8" />,
-        prompt: "A delicious, vibrant, close-up shot of the finished dish, beautifully plated on a rustic wooden table.",
-        overlayText: "EASY 10-MINUTE RECIPE",
-        style: 'Vibrant & Energetic',
-        emotion: 'Happy',
-        composition: 'Center-Focused',
-    },
-    {
-        name: 'Fitness Challenge',
-        icon: <FitnessIcon className="w-8 h-8" />,
-        prompt: "An energetic person in mid-workout, looking determined, with a blurred gym background.",
-        overlayText: "30 DAY CHALLENGE",
-        style: 'Dark & Moody',
-        emotion: 'Serious / Focused',
-        composition: 'Rule of Thirds: Subject Left',
-    },
-    {
-        name: 'Travel Vlog',
-        icon: <TravelIcon className="w-8 h-8" />,
-        prompt: "A breathtaking landscape view of a famous travel destination with a person looking out over the scene.",
-        overlayText: "WE WENT HERE!",
-        style: 'Cinematic',
-        emotion: 'Shocked / Surprised',
-        composition: 'Rule of Thirds: Subject Left',
-    },
-    {
-        name: 'DIY Tutorial',
-        icon: <DIYIcon className="w-8 h-8" />,
-        prompt: "A person's hands working on a craft project on a clean, well-lit workbench, with tools neatly arranged.",
-        overlayText: 'DIY PROJECT: STEP-BY-STEP',
-        style: 'Minimal & Clean',
-        emotion: 'Serious / Focused',
-        composition: 'Center-Focused',
-    },
-    {
-        name: 'Productivity Hack',
-        icon: <ProductivityIcon className="w-8 h-8" />,
-        prompt: 'A minimalist desk setup with a laptop, notebook, and a single plant. A stylized brain graphic with glowing lines.',
-        overlayText: '5 HACKS TO 10X YOUR FOCUS',
-        style: 'Vibrant & Energetic',
-        emotion: 'Serious / Focused',
-        composition: 'Center-Focused',
-    },
-    {
-        name: 'Movie Review',
-        icon: <MovieIcon className="w-8 h-8" />,
-        prompt: 'A cinematic composition featuring elements from a popular movie, with a dark and moody atmosphere and dramatic lighting.',
-        overlayText: 'THE ENDING EXPLAINED',
-        style: 'Cinematic',
-        emotion: 'Curious',
-        composition: 'Rule of Thirds: Subject Right',
-    },
-    {
-        name: 'Personal Vlog',
-        icon: <VlogIcon className="w-8 h-8" />,
-        prompt: 'A close-up, friendly portrait of a person talking directly to the camera, with a slightly blurred background of their room.',
-        overlayText: 'MY WEEKLY UPDATE',
-        style: 'Default',
-        emotion: 'Happy',
-        composition: 'Center-Focused',
-    },
-    {
-        name: 'Special Offer',
-        icon: <SparklesIcon className="w-8 h-8" />,
-        prompt: "A bold, attention-grabbing thumbnail for a sale or special offer. Prominently feature a discount percentage like '50% OFF!' or text like 'LIMITED TIME'. Use high-contrast colors and a sense of urgency.",
-        overlayText: '50% OFF TODAY!',
-        style: 'Vibrant & Energetic',
-        emotion: 'Excited',
-        composition: 'Center-Focused',
-    },
-    {
-        name: 'Brand Teaser',
-        icon: <MovieIcon className="w-8 h-8" />,
-        prompt: 'A cinematic and intriguing thumbnail teasing a brand story or documentary-style video. Use a dramatic, high-quality image related to the brand\'s origin or mission.',
-        overlayText: 'OUR STORY',
-        style: 'Cinematic',
-        emotion: 'Curious',
-        composition: 'Rule of Thirds: Subject Left',
-    },
-    {
-        name: 'Product Demo',
-        icon: <TechIcon className="w-8 h-8" />,
-        prompt: 'A clean, crisp thumbnail showing a key product in action or a close-up of its main feature, against a simple, non-distracting background.',
-        overlayText: 'SEE IT IN ACTION',
-        style: 'Minimal & Clean',
-        emotion: 'Happy',
-        composition: 'Center-Focused',
+        name: 'Business & Branding',
+        templates: [
+            { name: 'Special Offer', icon: <SparklesIcon className="w-8 h-8" />, prompt: "A bold, attention-grabbing thumbnail for a sale or special offer. Prominently feature a discount percentage like '50% OFF!' or text like 'LIMITED TIME'. Use high-contrast colors and a sense of urgency.", overlayText: '50% OFF TODAY!', style: 'Vibrant & Energetic', emotion: 'Excited', composition: 'Center-Focused' },
+            { name: 'Brand Teaser', icon: <MovieIcon className="w-8 h-8" />, prompt: 'A cinematic and intriguing thumbnail teasing a brand story or documentary-style video. Use a dramatic, high-quality image related to the brand\'s origin or mission.', overlayText: 'OUR STORY', style: 'Cinematic', emotion: 'Curious', composition: 'Rule of Thirds: Subject Left' },
+            { name: 'Product Demo', icon: <TechIcon className="w-8 h-8" />, prompt: 'A clean, crisp thumbnail showing a key product in action or a close-up of its main feature, against a simple, non-distracting background.', overlayText: 'SEE IT IN ACTION', style: 'Minimal & Clean', emotion: 'Happy', composition: 'Center-Focused' },
+            { name: 'Webinar / Workshop', icon: <VlogIcon className="w-8 h-8" />, prompt: "A professional thumbnail for an online event. Clearly display the topic, date, and a photo of the speaker(s).", overlayText: 'LIVE WORKSHOP', style: 'Minimal & Clean', emotion: 'Serious / Focused', composition: 'Default' },
+            { name: 'Case Study / Results', icon: <ProductivityIcon className="w-8 h-8" />, prompt: "A results-oriented thumbnail. Use big numbers, arrows pointing up, and before-and-after imagery to show success.", overlayText: '2X OUR GROWTH!', style: 'Vibrant & Energetic', emotion: 'Excited', composition: 'Rule of Thirds: Subject Right' },
+        ]
     }
 ];
 
@@ -191,6 +115,7 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
     const [isSuggestingElements, setIsSuggestingElements] = useState(false);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [selectedTemplateName, setSelectedTemplateName] = useState('Custom');
+    const [activeTemplateCategory, setActiveTemplateCategory] = useState<string>(thumbnailTemplateCategories[0].name);
 
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -212,8 +137,12 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
         }
     };
     
-    const handleTemplateClick = (template: typeof thumbnailTemplates[0]) => {
-        const finalPrompt = `A YouTube thumbnail for a video from "${brand.name}". The brand's core identity is "${brand.description}". The style must be heavily inspired by this brand identity. The specific creative concept for the thumbnail is: ${template.prompt}`;
+    const handleTemplateClick = (template: typeof thumbnailTemplateCategories[0]['templates'][0]) => {
+        const paletteInfo = paletteAsset?.palette 
+            ? `The brand's color palette is described as "${paletteAsset.palette.description}". This should influence the colors of the thumbnail.` 
+            : '';
+        const finalPrompt = `A YouTube thumbnail for a video from "${brand.name}". The brand's core identity is "${brand.description}". ${paletteInfo} The style must be heavily inspired by this brand identity. The specific creative concept for the thumbnail is: ${template.prompt}`;
+        
         setBaseImagePrompt(finalPrompt);
         setOverlayText(template.overlayText);
         setStyle(template.style);
@@ -721,18 +650,39 @@ const ThumbnailStudio: React.FC<ThumbnailStudioProps> = ({ brand, onUpdateBrand 
                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsTemplateModalOpen(false)}>
                     <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Templates</h2>
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Thumbnail Templates</h2>
                             <button onClick={() => setIsTemplateModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
                                 <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
                             </button>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-                            {thumbnailTemplates.map(template => (
-                                 <button key={template.name} onClick={() => handleTemplateClick(template)} disabled={isLoading} title={template.name} className="flex flex-col items-center justify-center text-center gap-2 p-3 aspect-square bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 disabled:opacity-50 hover:-translate-y-1">
-                                     <div className="text-indigo-600 dark:text-indigo-400">{template.icon}</div>
-                                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-tight">{template.name}</p>
-                                 </button>
-                            ))}
+                         <div className="flex flex-col sm:flex-row gap-6 max-h-[60vh]">
+                            <div className="sm:w-1/3 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-slate-700/50 pr-4">
+                                <nav className="flex sm:flex-col -mb-px sm:mb-0 space-x-2 sm:space-x-0 sm:space-y-1">
+                                    {thumbnailTemplateCategories.map(category => (
+                                        <button
+                                            key={category.name}
+                                            onClick={() => setActiveTemplateCategory(category.name)}
+                                            className={`w-full text-left p-2 rounded-md font-semibold text-sm transition-colors ${
+                                                activeTemplateCategory === category.name
+                                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            {category.name}
+                                        </button>
+                                    ))}
+                                </nav>
+                            </div>
+                            <div className="flex-1 overflow-y-auto sm:pl-4 pr-2 -mr-2">
+                               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {thumbnailTemplateCategories.find(c => c.name === activeTemplateCategory)?.templates.map(template => (
+                                     <button key={template.name} onClick={() => handleTemplateClick(template)} disabled={isLoading} title={template.name} className="flex flex-col items-center justify-center text-center gap-2 p-3 aspect-square bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 disabled:opacity-50 hover:-translate-y-1">
+                                         <div className="text-indigo-600 dark:text-indigo-400">{template.icon}</div>
+                                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-tight">{template.name}</p>
+                                     </button>
+                                ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

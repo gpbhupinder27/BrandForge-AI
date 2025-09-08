@@ -17,6 +17,9 @@ import TechIcon from './icons/TechIcon';
 import VlogIcon from './icons/VlogIcon';
 import TypographyIcon from './icons/TypographyIcon';
 import WandIcon from './icons/WandIcon';
+import BeakerIcon from './icons/BeakerIcon';
+import ChatBubbleIcon from './icons/ChatBubbleIcon';
+import DownloadIcon from './icons/DownloadIcon';
 
 interface VideoGeneratorProps {
   brand: Brand;
@@ -27,39 +30,34 @@ interface VideoGeneratorProps {
   onConversionHandled?: () => void;
 }
 
-const videoAdTemplates = [
+const videoAdTemplateCategories = [
     {
-        name: 'Cinematic Teaser',
-        icon: <MovieIcon className="w-8 h-8" />,
-        prompt: 'A dramatic, cinematic shot with high contrast and a shallow depth of field, suggesting a larger story. Perfect for a brand reveal or a teaser campaign.',
+        name: 'Brand Awareness',
+        templates: [
+            { name: 'Cinematic Teaser', icon: <MovieIcon className="w-8 h-8" />, prompt: 'A dramatic, cinematic shot with high contrast and a shallow depth of field, suggesting a larger story. Perfect for a brand reveal or a teaser campaign.' },
+            { name: 'Behind the Scenes', icon: <WandIcon className="w-8 h-8" />, prompt: 'A warm, authentic image that looks like a behind-the-scenes shot of the product being made or the service being provided. The style should be candid and trustworthy.' },
+            { name: 'Brand Story Intro', icon: <VlogIcon className="w-8 h-8" />, prompt: "A powerful, evocative image that represents the brand's core mission or origin story. The style should be high-quality and emotional." },
+            { name: 'Values Statement', icon: <TypographyIcon className="w-8 h-8" />, prompt: "A beautifully designed image featuring a core brand value or mission statement in elegant typography, set against a subtle, on-brand background." },
+        ],
     },
     {
-        name: 'Minimal Product Focus',
-        icon: <TechIcon className="w-8 h-8" />,
-        prompt: 'A clean, minimalist scene with a single pedestal or surface. The background is a soft, out-of-focus gradient of brand colors. Ideal for showcasing a product.',
+        name: 'Product Showcase',
+        templates: [
+            { name: 'Minimal Product Focus', icon: <TechIcon className="w-8 h-8" />, prompt: 'A clean, minimalist scene with a single pedestal or surface. The background is a soft, out-of-focus gradient of brand colors. Ideal for showcasing a product.' },
+            { name: 'Product in Context', icon: <ImageIcon className="w-8 h-8" />, prompt: "An image showing the product being used in its ideal environment, highlighting its benefits and the lifestyle it enables." },
+            { name: 'Exploded View / Feature Callout', icon: <BeakerIcon className="w-8 h-8" />, prompt: "A technical-style shot of a product, possibly with lines pointing to key features, on a clean, grid-like background. Perfect for showing off features." },
+            { name: 'Lifestyle Group Shot', icon: <VlogIcon className="w-8 h-8" />, prompt: "A vibrant image of a diverse group of people enjoying the product together, conveying a sense of community and shared experience." },
+        ],
     },
     {
-        name: 'Vibrant Lifestyle',
-        icon: <VlogIcon className="w-8 h-8" />,
-        prompt: 'A bright, energetic lifestyle photo showing people happily using a product in a natural, sunny environment. The mood is joyful and authentic.',
-    },
-    {
-        name: 'Abstract Background',
-        icon: <SparklesIcon className="w-8 h-8" />,
-        prompt: 'A beautiful abstract background using the brand\'s color palette, featuring flowing shapes, gentle gradients, or subtle textures. Perfect for overlaying text or product images.',
-    },
-    {
-        name: 'Bold Typography',
-        icon: <TypographyIcon className="w-8 h-8" />,
-        prompt: 'A bold, text-focused design. Use a single, powerful word or a short phrase from the brand description as the main visual element. The background should be a simple, textured brand color.',
-    },
-    {
-        name: 'Behind the Scenes',
-        icon: <WandIcon className="w-8 h-8" />,
-        prompt: 'A warm, authentic image that looks like a behind-the-scenes shot of the product being made or the service being provided. The style should be candid and trustworthy.',
+        name: 'Promotional',
+        templates: [
+            { name: 'Bold Typography', icon: <TypographyIcon className="w-8 h-8" />, prompt: 'A bold, text-focused design. Use a single, powerful word or a short phrase from the brand description as the main visual element. The background should be a simple, textured brand color.' },
+            { name: 'Limited Time Offer', icon: <SparklesIcon className="w-8 h-8" />, prompt: "An urgent, eye-catching scene with elements suggesting time is running out, like a subtle clock face or dynamic motion lines. Text overlay would announce the offer." },
+            { name: 'Testimonial Spotlight', icon: <ChatBubbleIcon className="w-8 h-8" />, prompt: "A clean, professional scene with a placeholder area for a customer photo and a powerful quote. The background should be simple and on-brand." },
+        ],
     },
 ];
-
 
 const inputClasses = "w-full bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-slate-900 dark:text-slate-100 transition-shadow";
 
@@ -69,6 +67,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
     const [addLogo, setAddLogo] = useState(true);
 
     const [activeImage, setActiveImage] = useState<{ id: string, url: string } | null>(null);
+    const [generatedVideo, setGeneratedVideo] = useState<{ id: string, url: string } | null>(null);
     const [editPrompt, setEditPrompt] = useState('');
 
     const [isLoadingImage, setIsLoadingImage] = useState(false);
@@ -79,6 +78,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
     const [isSuggesting, setIsSuggesting] = useState(false);
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
     const [previewingVideoAssetId, setPreviewingVideoAssetId] = useState<string | null>(null);
+    const [activeTemplateCategory, setActiveTemplateCategory] = useState<string>(videoAdTemplateCategories[0].name);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,7 +106,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
             setError("Please enter a prompt.");
             return;
         }
-
+        
+        setGeneratedVideo(null); // Clear any previous video preview
         setIsLoadingImage(true);
         setError(null);
 
@@ -185,6 +186,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 apiKey: falApiKey,
                 imageUrl: activeImage.url,
                 prompt: videoPrompt,
+                aspectRatio: 'auto',
             });
             
             const videoUrl = videoResponse.video.url;
@@ -198,8 +200,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 await storeImage(videoId, base64data);
 
                 const assetsToUpdate = [...brand.assets];
-
-                // Only add the source image as a new asset if it doesn't already exist.
                 const sourceAssetExists = brand.assets.some(asset => asset.id === activeImage.id);
                 if (!sourceAssetExists) {
                     const imageAsset: BrandAsset = {
@@ -211,11 +211,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                     assetsToUpdate.push(imageAsset);
                 }
 
-                // Save the video as a 'video_ad' asset
                 const videoAsset: BrandAsset = {
                     id: videoId,
                     type: 'video_ad',
-                    prompt: videoPrompt, // Use the more descriptive video prompt
+                    prompt: videoPrompt,
                     createdAt: new Date().toISOString(),
                     parentId: activeImage.id,
                 };
@@ -226,6 +225,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                     assets: assetsToUpdate
                 });
                 
+                setGeneratedVideo({ id: videoId, url: base64data });
                 setActiveImage(null);
                 setImagePrompt('');
                 setReferenceImageFile(null);
@@ -236,6 +236,20 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
             setError(err instanceof Error ? err.message : "An unknown error occurred while generating the video.");
             setIsLoadingVideo(false);
         }
+    };
+
+    const handleDownloadVideo = async (assetId: string) => {
+        const dataUrl = await getImage(assetId);
+        if (!dataUrl) {
+            setError("Could not find video to download.");
+            return;
+        }
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = `${brand.name}-video-ad-${assetId.slice(0, 6)}.mp4`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleSuggestPrompts = async () => {
@@ -264,7 +278,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
     };
 
     const handleTemplateClick = (templatePrompt: string) => {
-        const finalPrompt = `A base image for a video ad for "${brand.name}" (${brand.description}). Creative direction: ${templatePrompt}`;
+        const paletteAsset = brand.assets.find(a => a.type === 'palette');
+        const paletteInfo = paletteAsset?.palette 
+            ? `The brand's color palette is described as "${paletteAsset.palette.description}". This should influence the colors of the scene.`
+            : '';
+        const finalPrompt = `A base image for a video ad for "${brand.name}" (${brand.description}). ${paletteInfo} Creative direction: ${templatePrompt}`;
         setImagePrompt(finalPrompt);
         setIsTemplateModalOpen(false);
     };
@@ -278,7 +296,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                         <p className="text-sm text-slate-500 dark:text-slate-400">First, generate a static image. The final video will match this image's aspect ratio.</p>
                     </div>
 
-                    <div className={activeImage ? 'opacity-50 pointer-events-none' : ''}>
+                    <div className={activeImage || generatedVideo ? 'opacity-50 pointer-events-none' : ''}>
                         <button 
                             onClick={() => setIsTemplateModalOpen(true)} 
                             disabled={isLoadingImage}
@@ -372,6 +390,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                                     {isLoadingVideo ? 'Generating Video...' : 'Generate Video'}
                                 </button>
                             </div>
+                            {!falApiKey.trim() && (
+                                <p className="text-center text-red-500 dark:text-red-400 text-sm mt-2">
+                                    Please set your Fal.ai API key above to enable video generation.
+                                </p>
+                            )}
                         </div>
                    )}
                 </div>
@@ -402,6 +425,25 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                                 </div>
                             )}
                         </div>
+                   ) : generatedVideo ? (
+                        <div className="w-full space-y-4 text-center">
+                            <h4 className="text-lg font-semibold text-green-600 dark:text-green-400">Video Generated Successfully!</h4>
+                            <AsyncVideo assetId={generatedVideo.id} className="w-full rounded-md object-contain" controls autoPlay />
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <button
+                                    onClick={() => setGeneratedVideo(null)}
+                                    className="px-6 py-3 font-semibold bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors"
+                                >
+                                    Create Another
+                                </button>
+                                <button
+                                    onClick={() => handleDownloadVideo(generatedVideo.id)}
+                                    className="flex items-center justify-center gap-2 px-6 py-3 font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors"
+                                >
+                                    <DownloadIcon className="w-5 h-5" /> Download Video
+                                </button>
+                            </div>
+                        </div>
                    ) : (
                     <div className="text-center text-slate-500 dark:text-slate-400">
                         <ImageIcon className="w-16 h-16 mx-auto" />
@@ -415,20 +457,41 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
 
             {isTemplateModalOpen && (
                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsTemplateModalOpen(false)}>
-                    <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Image Templates</h2>
                             <button onClick={() => setIsTemplateModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
                                 <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
                             </button>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-                            {videoAdTemplates.map(template => (
-                                <button key={template.name} onClick={() => handleTemplateClick(template.prompt)} disabled={isLoadingImage} className="text-left p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50">
-                                    <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-slate-900 dark:text-slate-100">{template.name}</span></div>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{template.prompt}</p>
-                                </button>
-                            ))}
+                        <div className="flex flex-col sm:flex-row gap-6 max-h-[60vh]">
+                            <div className="sm:w-1/3 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-slate-700/50 pr-4">
+                                <nav className="flex sm:flex-col -mb-px sm:mb-0 space-x-2 sm:space-x-0 sm:space-y-1">
+                                    {videoAdTemplateCategories.map(category => (
+                                        <button
+                                            key={category.name}
+                                            onClick={() => setActiveTemplateCategory(category.name)}
+                                            className={`w-full text-left p-2 rounded-md font-semibold text-sm transition-colors ${
+                                                activeTemplateCategory === category.name
+                                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            {category.name}
+                                        </button>
+                                    ))}
+                                </nav>
+                            </div>
+                            <div className="flex-1 overflow-y-auto sm:pl-4 pr-2 -mr-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {videoAdTemplateCategories.find(c => c.name === activeTemplateCategory)?.templates.map(template => (
+                                    <button key={template.name} onClick={() => handleTemplateClick(template.prompt)} disabled={isLoadingImage} className="text-left p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50">
+                                        <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-slate-900 dark:text-slate-100">{template.name}</span></div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{template.prompt}</p>
+                                    </button>
+                                ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -439,6 +502,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                     <div className="bg-black rounded-lg max-w-5xl w-full shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => setPreviewingVideoAssetId(null)} className="absolute -top-3 -right-3 bg-white dark:bg-slate-700 p-1.5 rounded-full z-10 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600">
                             <XMarkIcon className="w-6 h-6" />
+                        </button>
+                        <button onClick={() => handleDownloadVideo(previewingVideoAssetId)} className="absolute top-2 right-12 bg-white/80 dark:bg-slate-900/80 p-2 rounded-full z-10 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-900 transition-colors" title="Download Video">
+                            <DownloadIcon className="w-6 h-6" />
                         </button>
                         <AsyncVideo assetId={previewingVideoAssetId} className="w-full h-auto max-h-[85vh] object-contain rounded-lg" controls autoPlay />
                     </div>

@@ -50,7 +50,7 @@ const App: React.FC = () => {
   const selectedBrand = brands.find(brand => brand.id === selectedBrandId);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 font-sans">
+    <div className="min-h-screen text-slate-900 dark:text-slate-50 font-sans">
       <Header />
       <main className="container mx-auto">
         {!dbReady ? (

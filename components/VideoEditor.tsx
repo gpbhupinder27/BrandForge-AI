@@ -1,28 +1,65 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Brand, BrandAsset } from '../types';
 import { renderVideo } from '../services/videoEditorService';
 import { getImage, storeImage } from '../services/imageDb';
+import { generateVideoThumbnail, getVideoDuration } from '../services/videoUtils';
 import Loader from './Loader';
 import FilmIcon from './icons/FilmIcon';
 import ExportIcon from './icons/ExportIcon';
 import PlusIcon from './icons/PlusIcon';
 import TrashIcon from './icons/TrashIcon';
 import VideoPlayer from './VideoPlayer';
+import XMarkIcon from './icons/XMarkIcon';
+import PlayIcon from './icons/PlayIcon';
 
 type Clip = {
     id: string; // unique ID for the timeline instance
     assetId: string;
     sourceUrl: string;
+    thumbnailUrl: string;
     duration: number; // original duration
     trimStart: number;
     trimEnd: number;
 };
 
-const formatTime = (time: number) => {
+const formatTime = (time: number | undefined) => {
+    if (typeof time !== 'number' || isNaN(time)) return '00:00.0';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const milliseconds = Math.floor((time * 10) % 10);
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${milliseconds}`;
 };
+
+const VideoLibraryItem: React.FC<{ asset: BrandAsset, onAdd: (asset: BrandAsset) => void }> = ({ asset, onAdd }) => {
+    const [thumbnail, setThumbnail] = useState<string | null>(null);
+    const [duration, setDuration] = useState<number>(0);
+
+    useEffect(() => {
+        const generateThumb = async () => {
+            const dataUrl = await getImage(asset.id);
+            if (dataUrl) {
+                const thumbUrl = await generateVideoThumbnail(dataUrl);
+                setThumbnail(thumbUrl);
+                const videoDuration = await getVideoDuration(asset.id);
+                setDuration(videoDuration);
+            }
+        };
+        generateThumb();
+    }, [asset.id]);
+
+    return (
+        <div className="group relative rounded-md overflow-hidden bg-slate-200 dark:bg-slate-700 aspect-video">
+            {thumbnail ? <img src={thumbnail} className="w-full h-full object-cover" alt={`Thumbnail for ${asset.id}`} /> : <div className="w-full h-full flex items-center justify-center"><Loader message="" subMessage=""/></div>}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                <span className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded-full self-end">{formatTime(duration)}</span>
+                <button onClick={() => onAdd(asset)} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-white/80 dark:bg-slate-900/80 text-slate-900 dark:text-white text-xs font-semibold rounded-md hover:scale-105 transition-transform">
+                    <PlusIcon className="w-4 h-4" /> Add
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 interface VideoEditorProps {
   brand: Brand;
@@ -32,67 +69,73 @@ interface VideoEditorProps {
 
 const VideoEditor: React.FC<VideoEditorProps> = ({ brand, onUpdateBrand, videoAssets }) => {
     const [timelineClips, setTimelineClips] = useState<Clip[]>([]);
-    const [activeClipId, setActiveClipId] = useState<string | null>(null);
+    const [activeClip, setActiveClip] = useState<Clip | null>(null);
 
     const [isRendering, setIsRendering] = useState(false);
     const [renderProgress, setRenderProgress] = useState(0);
     const [renderMessage, setRenderMessage] = useState('');
     const [error, setError] = useState<string | null>(null);
 
-    const activeClipUrl = useMemo(() => {
-        if (!activeClipId) return null;
-        const clip = timelineClips.find(c => c.id === activeClipId);
-        return clip ? clip.sourceUrl : null;
-    }, [activeClipId, timelineClips]);
+    const totalDuration = useMemo(() => timelineClips.reduce((acc, clip) => acc + (clip.trimEnd - clip.trimStart), 0), [timelineClips]);
 
     const addClipToTimeline = useCallback(async (asset: BrandAsset) => {
-        const dataUrl = await getImage(asset.id);
-        if (!dataUrl) {
-            setError(`Could not load video data for asset ${asset.id}`);
-            return;
-        }
+        try {
+            const dataUrl = await getImage(asset.id);
+            if (!dataUrl) {
+                throw new Error(`Could not load video data for asset ${asset.id}`);
+            }
+            const thumbnailUrl = await generateVideoThumbnail(dataUrl);
+            const duration = await getVideoDuration(asset.id);
 
-        const tempVideo = document.createElement('video');
-        tempVideo.src = dataUrl;
-        tempVideo.onloadedmetadata = () => {
             const newClip: Clip = {
                 id: crypto.randomUUID(),
                 assetId: asset.id,
                 sourceUrl: dataUrl,
-                duration: tempVideo.duration,
+                thumbnailUrl,
+                duration: duration,
                 trimStart: 0,
-                trimEnd: tempVideo.duration,
+                trimEnd: duration,
             };
             setTimelineClips(prev => [...prev, newClip]);
-            // If it's the first clip, make it active
-            if (timelineClips.length === 0) {
-                 setActiveClipId(newClip.id);
+            if (!activeClip) {
+                 setActiveClip(newClip);
             }
-        };
-    }, [timelineClips.length]);
+        } catch(err) {
+            setError(err instanceof Error ? err.message : 'Could not add clip');
+        }
+    }, [activeClip]);
 
     const removeClipFromTimeline = (clipId: string) => {
         setTimelineClips(prev => {
             const newClips = prev.filter(c => c.id !== clipId);
-            // If the removed clip was the one being previewed, update the preview
-            if (activeClipId === clipId) {
-                setActiveClipId(newClips.length > 0 ? newClips[0].id : null);
+            if (activeClip?.id === clipId) {
+                setActiveClip(newClips.length > 0 ? newClips[0] : null);
             }
             return newClips;
         });
     };
 
     const handleTrimChange = (clipId: string, type: 'start' | 'end', value: number) => {
-        setTimelineClips(prev => prev.map(clip => {
+        const updatedClips = timelineClips.map(clip => {
             if (clip.id === clipId) {
+                let newStart = clip.trimStart;
+                let newEnd = clip.trimEnd;
                 if (type === 'start') {
-                    return { ...clip, trimStart: Math.max(0, Math.min(value, clip.trimEnd - 0.1)) };
+                    newStart = Math.max(0, Math.min(value, clip.trimEnd - 0.1));
                 } else {
-                    return { ...clip, trimEnd: Math.min(clip.duration, Math.max(value, clip.trimStart + 0.1)) };
+                    newEnd = Math.min(clip.duration, Math.max(value, clip.trimStart + 0.1));
                 }
+                return { ...clip, trimStart: newStart, trimEnd: newEnd };
             }
             return clip;
-        }));
+        });
+        setTimelineClips(updatedClips);
+        
+        // Also update the activeClip state if it's the one being edited
+        const active = updatedClips.find(c => c.id === activeClip?.id);
+        if (active) {
+            setActiveClip(active);
+        }
     };
 
     const handleExport = async () => {
@@ -129,7 +172,7 @@ const VideoEditor: React.FC<VideoEditorProps> = ({ brand, onUpdateBrand, videoAs
             
             onUpdateBrand({ ...brand, assets: [...brand.assets, newAsset] });
             setTimelineClips([]);
-            setActiveClipId(null);
+            setActiveClip(null);
         } catch (err) {
             console.error("Rendering failed:", err);
             setError(err instanceof Error ? err.message : "An unknown error occurred during rendering.");
@@ -139,7 +182,7 @@ const VideoEditor: React.FC<VideoEditorProps> = ({ brand, onUpdateBrand, videoAs
     };
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-320px)]">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 h-[calc(100vh-320px)]">
             {isRendering && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-lg max-w-md w-full">
@@ -152,66 +195,75 @@ const VideoEditor: React.FC<VideoEditorProps> = ({ brand, onUpdateBrand, videoAs
                     </div>
                 </div>
             )}
-            {/* Left: Media Library */}
-            <div className="lg:w-1/4 bg-white dark:bg-slate-800/50 p-4 rounded-lg shadow-md border border-slate-200 dark:border-slate-700/50 overflow-y-auto">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+
+            {/* Media Library */}
+            <div className="xl:col-span-1 bg-white dark:bg-slate-800/50 p-4 rounded-lg shadow-md border border-slate-200 dark:border-slate-700/50 flex flex-col">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2 flex-shrink-0">
                     <FilmIcon className="w-5 h-5" /> Video Library
                 </h3>
-                <div className="space-y-3">
-                    {videoAssets.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">No videos found. Use the Generator tab to create some.</p>}
+                <div className="grid grid-cols-2 gap-3 overflow-y-auto">
+                    {videoAssets.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400 col-span-2">No videos found. Use the Generator tab to create some.</p>}
                     {videoAssets.map(asset => (
-                        <div key={asset.id} className="group relative">
-                            <video src={asset.id} className="w-full rounded-md bg-slate-200 dark:bg-slate-700" muted preload="metadata" />
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <button onClick={() => addClipToTimeline(asset)} className="flex items-center gap-2 px-3 py-1.5 bg-white/80 dark:bg-slate-900/80 text-slate-900 dark:text-white text-xs font-semibold rounded-full hover:scale-105 transition-transform">
-                                    <PlusIcon className="w-4 h-4" /> Add to Timeline
-                                </button>
-                            </div>
-                        </div>
+                        <VideoLibraryItem key={asset.id} asset={asset} onAdd={addClipToTimeline} />
                     ))}
                 </div>
             </div>
 
-            {/* Right: Editor */}
-            <div className="flex-1 flex flex-col gap-4">
-                <div className="flex-1 bg-black rounded-lg flex items-center justify-center p-2 relative">
-                    <VideoPlayer src={activeClipUrl} className="max-w-full max-h-full" />
-                     <button onClick={handleExport} disabled={isRendering || timelineClips.length === 0} className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-wait shadow">
-                        <ExportIcon className="w-5 h-5" />
-                        {isRendering ? 'Rendering...' : 'Export Video'}
-                    </button>
+            {/* Editor */}
+            <div className="xl:col-span-3 flex flex-col gap-4">
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
+                    <div className="lg:col-span-2 bg-black rounded-lg relative flex flex-col">
+                        <VideoPlayer key={activeClip?.id} src={activeClip?.sourceUrl || null} startTime={activeClip?.trimStart} endTime={activeClip?.trimEnd} />
+                        <button onClick={handleExport} disabled={isRendering || timelineClips.length === 0} className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-wait shadow">
+                            <ExportIcon className="w-5 h-5" />
+                            {isRendering ? 'Rendering...' : 'Export Video'}
+                        </button>
+                    </div>
+                    <div className="lg:col-span-1 bg-white dark:bg-slate-800/50 p-4 rounded-lg shadow-md border border-slate-200 dark:border-slate-700/50 overflow-y-auto">
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-2 text-sm">Clip Inspector</h3>
+                        {activeClip ? (
+                            <div className="space-y-4">
+                                <p className="text-xs font-mono text-slate-500 dark:text-slate-400">Clip ID: {activeClip.assetId.slice(0, 12)}...</p>
+                                <div>
+                                    <label className="block font-medium text-xs mb-1">Trim Start: {formatTime(activeClip.trimStart)}</label>
+                                    <input type="range" min="0" max={activeClip.duration} step="0.1" value={activeClip.trimStart} onChange={e => handleTrimChange(activeClip.id, 'start', parseFloat(e.target.value))} className="w-full accent-indigo-600"/>
+                                </div>
+                                <div>
+                                    <label className="block font-medium text-xs mb-1">Trim End: {formatTime(activeClip.trimEnd)}</label>
+                                    <input type="range" min="0" max={activeClip.duration} step="0.1" value={activeClip.trimEnd} onChange={e => handleTrimChange(activeClip.id, 'end', parseFloat(e.target.value))} className="w-full accent-indigo-600"/>
+                                </div>
+                                <p className="font-semibold text-xs">Selected Duration: {formatTime(activeClip.trimEnd - activeClip.trimStart)}</p>
+                            </div>
+                        ) : <p className="text-xs text-slate-500 dark:text-slate-400">Select a clip in the timeline to edit it.</p>}
+                    </div>
                 </div>
-                {error && <p className="text-center text-red-500 dark:text-red-400">{error}</p>}
                 
                 {/* Timeline */}
-                <div className="h-48 bg-white dark:bg-slate-800/50 p-4 rounded-lg shadow-md border border-slate-200 dark:border-slate-700/50 overflow-y-auto">
-                     <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-2 text-sm">Timeline</h3>
-                     <div className="space-y-2">
-                        {timelineClips.map((clip) => (
-                             <div key={clip.id} onClick={() => setActiveClipId(clip.id)} className={`p-2 rounded-md cursor-pointer transition-colors ${activeClipId === clip.id ? 'bg-indigo-100 dark:bg-indigo-900/50' : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>
-                                <div className="flex justify-between items-center mb-2">
-                                    <p className="text-xs font-semibold truncate">Clip: {clip.assetId.slice(0, 8)}</p>
-                                    <button onClick={(e) => { e.stopPropagation(); removeClipFromTimeline(clip.id); }} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full">
-                                        <TrashIcon className="w-4 h-4 text-red-500 dark:text-red-400" />
+                <div className="h-44 bg-white dark:bg-slate-800/50 p-4 rounded-lg shadow-md border border-slate-200 dark:border-slate-700/50 flex flex-col">
+                     <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">Timeline</h3>
+                        <p className="text-sm font-mono text-slate-600 dark:text-slate-300">Total Duration: {formatTime(totalDuration)}</p>
+                     </div>
+                     <div className="flex-1 flex items-center gap-2 overflow-x-auto bg-slate-100 dark:bg-slate-900/50 p-2 rounded-md">
+                        {timelineClips.map((clip) => {
+                            const clipDuration = clip.trimEnd - clip.trimStart;
+                            const width = Math.max(50, (clipDuration / Math.max(totalDuration, 1)) * 1000); // Proportional width with a minimum
+                            return (
+                                <div key={clip.id} onClick={() => setActiveClip(clip)} style={{ minWidth: `${width}px` }} className={`h-full group relative rounded-md cursor-pointer flex-shrink-0 border-2 transition-colors ${activeClip?.id === clip.id ? 'border-indigo-500' : 'border-transparent'}`}>
+                                    <img src={clip.thumbnailUrl} alt="clip thumbnail" className="w-full h-full object-cover rounded" />
+                                     <div className="absolute inset-0 bg-black/40"></div>
+                                    <span className="absolute bottom-1 left-1.5 text-white text-[10px] font-mono drop-shadow-md bg-black/40 px-1 rounded">{formatTime(clipDuration)}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); removeClipFromTimeline(clip.id); }} className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500">
+                                        <XMarkIcon className="w-3 h-3"/>
                                     </button>
                                 </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
-                                    <div>
-                                        <label className="block font-medium mb-1">Trim Start: {formatTime(clip.trimStart)}</label>
-                                        <input type="range" min="0" max={clip.duration} step="0.1" value={clip.trimStart} onClick={e => e.stopPropagation()} onChange={e => handleTrimChange(clip.id, 'start', parseFloat(e.target.value))} className="w-full accent-indigo-600"/>
-                                    </div>
-                                    <div>
-                                        <label className="block font-medium mb-1">Trim End: {formatTime(clip.trimEnd)}</label>
-                                        <input type="range" min="0" max={clip.duration} step="0.1" value={clip.trimEnd} onClick={e => e.stopPropagation()} onChange={e => handleTrimChange(clip.id, 'end', parseFloat(e.target.value))} className="w-full accent-indigo-600"/>
-                                    </div>
-                                    <p className="font-semibold">Duration: {formatTime(clip.trimEnd - clip.trimStart)}</p>
-                                </div>
-                            </div>
-                        ))}
-                         {timelineClips.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">Add videos from the library to start editing.</p>}
+                            )
+                        })}
+                         {timelineClips.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400 text-center w-full">Add videos from the library to start editing.</p>}
                      </div>
                 </div>
             </div>
+             {error && <div className="fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-fade-in"><p>Error: {error}</p></div>}
         </div>
     );
 };

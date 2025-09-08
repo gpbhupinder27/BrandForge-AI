@@ -15,7 +15,6 @@ import XMarkIcon from './icons/XMarkIcon';
 import ChatBubbleIcon from './icons/ChatBubbleIcon';
 import BeakerIcon from './icons/BeakerIcon';
 import VideoIcon from './icons/VideoIcon';
-// Fix: Import AssetPreviewModal to resolve 'Cannot find name' error.
 import AssetPreviewModal from './AssetPreviewModal';
 
 interface CreativeLabProps {
@@ -27,43 +26,35 @@ interface CreativeLabProps {
 type LogoPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'watermark' | 'none';
 type CreativeTab = 'single' | 'campaign';
 
-const templates = [
+const templateCategories = [
     {
-        name: 'Flash Sale',
-        description: 'Announce a limited-time sale.',
-        prompt: 'An exciting and eye-catching social media post announcing a flash sale. The main text should be "50% OFF FLASH SALE". Use dynamic elements and a sense of urgency. Include a "Shop Now" button.',
-        icon: <SparklesIcon className="w-6 h-6" />
+        name: 'Promotional & Sales',
+        templates: [
+            { name: 'Flash Sale', prompt: 'An exciting and eye-catching social media post announcing a flash sale. The main text should be "50% OFF FLASH SALE". Use dynamic elements and a sense of urgency. Include a "Shop Now" button.' },
+            { name: 'New Product Launch', prompt: 'A clean, modern, and minimalist banner to announce a new product launch. The background should be simple to make the product stand out. Headline text: "The Future is Here". Sub-headline: "Introducing our new collection".' },
+            { name: 'Limited Edition Drop', prompt: 'A post for a highly anticipated, limited edition product drop. Create a sense of exclusivity and urgency.' },
+            { name: 'Discount Code Offer', prompt: "A clean, eye-catching design that prominently features a discount code, like 'SAVE20'. Include a 'Shop Now' call to action." },
+            { name: 'Giveaway Announcement', prompt: "An exciting and vibrant post announcing a product giveaway. Clearly state 'GIVEAWAY!' and include visuals of the prize." },
+        ],
     },
     {
-        name: 'New Product Launch',
-        description: 'Showcase a new product.',
-        prompt: 'A clean, modern, and minimalist banner to announce a new product launch. The background should be simple to make the product stand out. Headline text: "The Future is Here". Sub-headline: "Introducing our new collection".',
-        icon: <ImageIcon className="w-6 h-6" />
+        name: 'Brand & Community',
+        templates: [
+            { name: 'Customer Testimonial', prompt: 'A visually appealing social media post featuring a customer testimonial. Prominently display a placeholder for a customer quote and name. The design should feel authentic and trustworthy.' },
+            { name: 'Behind the Scenes', prompt: "A candid, authentic-feeling post showing a glimpse behind the scenes of the brand. Could be the workshop, the team, or the creation process." },
+            { name: 'Meet the Founder/Team', prompt: "A professional yet approachable post introducing the founder or a team member. Include a placeholder for a photo and a short bio or quote." },
+            { name: 'Brand Values Showcase', prompt: "A simple, text-focused post that highlights a core brand value (e.g., 'Sustainability', 'Handcrafted Quality'). Use brand colors and fonts effectively." },
+        ],
     },
     {
-        name: 'Event Invitation',
-        description: 'Invite your audience to an event.',
-        prompt: 'An elegant and professional invitation for a webinar event. Title: "You\'re Invited". Include clearly legible text placeholders for an event title, date, time, and a "Register Now" call-to-action button.',
-        icon: <TemplateIcon className="w-6 h-6" />
+        name: 'Informational & Engagement',
+        templates: [
+            { name: 'Educational Tip', prompt: 'An informative and engaging Instagram post sharing a helpful tip. Title: "Pro Tip: [Your Tip Here]". Use clear visuals or an icon to illustrate the concept. Keep the text concise and easy to read. Style should be clean and authoritative.' },
+            { name: 'Event Invitation', prompt: 'An elegant and professional invitation for a webinar event. Title: "You\'re Invited". Include clearly legible text placeholders for an event title, date, time, and a "Register Now" call-to-action button.' },
+            { name: 'Myth vs. Fact', prompt: "An engaging post designed to bust a common myth related to the brand's industry. Use a split design with 'Myth' on one side and 'Fact' on the other." },
+            { name: 'Question of the Day', prompt: "A simple, visually appealing post designed to ask the audience a question to drive engagement in the comments." },
+        ],
     },
-    {
-        name: 'Customer Testimonial',
-        description: 'Highlight a positive review.',
-        prompt: 'A visually appealing social media post featuring a customer testimonial. Prominently display a placeholder for a customer quote and name. The design should feel authentic and trustworthy.',
-        icon: <ChatBubbleIcon className="w-6 h-6" />
-    },
-    {
-        name: 'Educational Tip',
-        description: 'Share a helpful tip or fact.',
-        prompt: 'An informative and engaging Instagram post sharing a helpful tip. Title: "Pro Tip: [Your Tip Here]". Use clear visuals or an icon to illustrate the concept. Keep the text concise and easy to read. Style should be clean and authoritative.',
-        icon: <LightbulbIcon className="w-6 h-6" />
-    },
-    {
-        name: 'Case Study Highlight',
-        description: 'Showcase a success story.',
-        prompt: 'A professional banner highlighting a successful case study. Main headline: "Success Story:". Sub-headline: "[Key Result, e.g., 200% ROI Increase]". Include a subtle call to action like "Read the full story".',
-        icon: <BeakerIcon className="w-6 h-6" />
-    }
 ];
 
 const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onRequestVideoConversion }) => {
@@ -96,6 +87,8 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
   const fileInputRef = useRef<HTMLInputElement>(null);
   const campaignFileInputRef = useRef<HTMLInputElement>(null);
   const [isCreativeTemplateModalOpen, setIsCreativeTemplateModalOpen] = useState(false);
+  const [activeTemplateCategory, setActiveTemplateCategory] = useState<string>(templateCategories[0].name);
+
   
   const logoAsset = brand.assets.find(asset => asset.type === 'logo' && asset.isPrimary) || brand.assets.find(asset => asset.type === 'logo');
   const paletteAsset = brand.assets.find(asset => asset.type === 'palette');
@@ -198,7 +191,10 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
   };
 
   const handleTemplateClick = (templatePrompt: string) => {
-    const finalPrompt = `A marketing creative for "${brand.name}", a brand that is all about "${brand.description}". The creative direction is: ${templatePrompt}`;
+    const paletteInfo = paletteAsset?.palette 
+        ? `The brand's color palette is described as "${paletteAsset.palette.description}" and includes these colors: ${paletteAsset.palette.colors.map(c => c.name).join(', ')}. The creative should strongly reflect this palette.`
+        : '';
+    const finalPrompt = `A marketing creative for "${brand.name}", a brand that is all about "${brand.description}". ${paletteInfo} The creative direction is: ${templatePrompt}`;
     setPrompt(finalPrompt);
     setIsCreativeTemplateModalOpen(false);
   };
@@ -888,29 +884,50 @@ const CreativeLab: React.FC<CreativeLabProps> = ({ brand, onUpdateBrand, onReque
 
       {isCreativeTemplateModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsCreativeTemplateModalOpen(false)}>
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Creative Templates</h2>
-                <button onClick={() => setIsCreativeTemplateModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
-                    <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
-                </button>
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Browse Creative Templates</h2>
+                    <button onClick={() => setIsCreativeTemplateModalOpen(false)} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700">
+                        <XMarkIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
+                    </button>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-6 max-h-[60vh]">
+                    <div className="sm:w-1/3 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-slate-700/50 pr-4">
+                        <nav className="flex sm:flex-col -mb-px sm:mb-0 space-x-2 sm:space-x-0 sm:space-y-1">
+                            {templateCategories.map(category => (
+                                <button
+                                    key={category.name}
+                                    onClick={() => setActiveTemplateCategory(category.name)}
+                                    className={`w-full text-left p-2 rounded-md font-semibold text-sm transition-colors ${
+                                        activeTemplateCategory === category.name
+                                        ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {category.name}
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
+                    <div className="flex-1 overflow-y-auto sm:pl-4 pr-2 -mr-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {templateCategories.find(c => c.name === activeTemplateCategory)?.templates.map(template => (
+                                <button 
+                                    key={template.name} 
+                                    onClick={() => handleTemplateClick(template.prompt)} 
+                                    disabled={isLoading} 
+                                    className="text-left p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50"
+                                >
+                                    <p className="font-semibold text-slate-900 dark:text-slate-100">{template.name}</p>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{template.prompt}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-              {templates.map(template => (
-                  <button 
-                      key={template.name} 
-                      onClick={() => handleTemplateClick(template.prompt)} 
-                      disabled={isLoading} 
-                      className="text-left p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50"
-                  >
-                      <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400">{template.icon} <span className="font-semibold text-slate-900 dark:text-slate-100">{template.name}</span></div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">{template.description}</p>
-                  </button>
-              ))}
-            </div>
-          </div>
         </div>
-      )}
+       )}
 
        {previewingAsset && (
         <AssetPreviewModal
