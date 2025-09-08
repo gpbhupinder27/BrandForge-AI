@@ -59,6 +59,8 @@ export interface GeneratedImagePart {
 
 export type GeneratedPart = { text: string } | { inlineData: GeneratedImagePart };
 
+export type LogoPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'watermark' | 'none';
+
 export interface TextOverlay {
   id: string;
   text: string;

@@ -33,7 +33,7 @@ const Homepage: React.FC<HomepageProps> = ({ onGetStarted }) => {
   return (
     <div className="animate-fade-in bg-slate-50 dark:bg-slate-900">
       {/* Hero Section */}
-      <section className="relative text-center pt-24 pb-28 sm:pt-32 sm:pb-36 overflow-hidden">
+      <section className="relative text-center pt-24 pb-12 sm:pt-32 sm:pb-16 overflow-hidden">
         <div className="relative max-w-4xl mx-auto px-4 z-10">
             <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
             Build Your Brand in Minutes, <span className="text-indigo-500 dark:text-indigo-400">Not Weeks</span>

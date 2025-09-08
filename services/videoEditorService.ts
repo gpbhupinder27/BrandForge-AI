@@ -84,6 +84,8 @@ export const renderVideo = async ({ clips, textOverlays, brand, onProgress }: Re
         ffmpeg = createFFmpeg({
             log: true,
             progress: (p: { ratio: number, time: number}) => onProgress({ ...p, ratio: Math.min(1, p.ratio), message: "Rendering..." }),
+            // FIX: Use single-threaded core to avoid SharedArrayBuffer issues in environments without cross-origin isolation.
+            corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.0/dist/ffmpeg-core.js',
         });
         await ffmpeg.load();
     }

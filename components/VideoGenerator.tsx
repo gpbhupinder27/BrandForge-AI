@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Brand, BrandAsset } from '../types';
+import { Brand, BrandAsset, LogoPosition } from '../types';
 import { generateWithNanoBanana, fileToBase64, generatePromptSuggestions, describeImage } from '../services/geminiService';
 import { generateVideoFromImage } from '../services/falService';
 import { storeImage, getImage } from '../services/imageDb';
@@ -65,6 +65,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
     const [imagePrompt, setImagePrompt] = useState('');
     const [referenceImageFile, setReferenceImageFile] = useState<File | null>(null);
     const [addLogo, setAddLogo] = useState(true);
+    const [logoPosition, setLogoPosition] = useState<LogoPosition>('top-right');
 
     const [activeImage, setActiveImage] = useState<{ id: string, url: string } | null>(null);
     const [generatedVideo, setGeneratedVideo] = useState<{ id: string, url: string } | null>(null);
@@ -116,7 +117,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
             const logoAsset = brand.assets.find(a => a.type === 'logo' && a.isPrimary) || brand.assets.find(a => a.type === 'logo');
             let logoInstruction = 'The brand logo should not be included in the image.';
 
-            if (addLogo && logoAsset) {
+            if (addLogo && logoPosition !== 'none' && logoAsset) {
                 const logoImageUrl = await getImage(logoAsset.id);
                 if (!logoImageUrl) throw new Error("Logo image not found.");
                 const logoResponse = await fetch(logoImageUrl);
@@ -124,7 +125,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                 const logoFile = new File([logoBlob], "logo.png", { type: logoBlob.type });
                 const logoBase64 = await fileToBase64(logoFile);
                 imageInputs.push({ data: logoBase64, mimeType: logoFile.type });
-                logoInstruction = `CRITICAL: The first image provided is the brand's logo, which is on a plain solid white background. You MUST remove this white background completely, treating it as transparent. Integrate ONLY the logo's graphic/text seamlessly into your design in a professional and unobtrusive way, like the bottom-right corner. The logo should be small, occupying no more than 10% of the image width. DO NOT show the square white background of the logo file.`;
+                logoInstruction = `CRITICAL: The first image provided is the brand's logo, which is on a plain solid white background. You MUST remove this white background completely, treating it as transparent. Integrate ONLY the logo's graphic/text seamlessly into your design. The logo should be small, occupying no more than 10% of the image width. DO NOT show the square white background of the logo file. Place this logo in a ${logoPosition === 'watermark' ? 'subtle watermark style' : `clear and visible manner in the ${logoPosition.replace('-', ' ')} corner`}.`;
             }
 
 
@@ -329,23 +330,36 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ brand, onUpdateBrand, f
                         
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Options</label>
-                            <div className="flex items-center justify-between gap-4">
-                                <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
-                                    <ImageIcon className="w-5 h-5" />
-                                    Upload Image
-                                </button>
-                                <input type="file" accept="image/*" onChange={e => e.target.files && setReferenceImageFile(e.target.files[0])} ref={fileInputRef} className="hidden" disabled={isLoadingImage} />
-                                
-                                <div className="flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-900/30 rounded-md">
-                                    <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Add Brand Logo</span>
-                                    <button
-                                        onClick={() => setAddLogo(!addLogo)}
-                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${addLogo ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                        role="switch"
-                                        aria-checked={addLogo}
-                                    >
-                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${addLogo ? 'translate-x-5' : 'translate-x-0'}`} />
+                            <div className="space-y-4">
+                                <div>
+                                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-200 dark:bg-slate-700 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                                        <ImageIcon className="w-5 h-5" />
+                                        Upload Reference Image
                                     </button>
+                                    <input type="file" accept="image/*" onChange={e => e.target.files && setReferenceImageFile(e.target.files[0])} ref={fileInputRef} className="hidden" disabled={isLoadingImage} />
+                                </div>
+                                
+                                <div className="p-3 bg-slate-50 dark:bg-slate-900/30 rounded-md border border-slate-200 dark:border-slate-700/50">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Add Brand Logo</span>
+                                        <button
+                                            onClick={() => setAddLogo(!addLogo)}
+                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${addLogo ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                            role="switch"
+                                            aria-checked={addLogo}
+                                        >
+                                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${addLogo ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        </button>
+                                    </div>
+                                    <div className={`mt-3 transition-opacity ${!addLogo ? 'opacity-40 pointer-events-none' : ''}`}>
+                                        <div className="flex flex-wrap gap-2">
+                                            {(['top-right', 'top-left', 'bottom-left', 'bottom-right', 'watermark', 'none'] as LogoPosition[]).map(pos => (
+                                                <button key={pos} onClick={() => setLogoPosition(pos)} disabled={isLoadingImage} className={`px-3 py-1 text-xs rounded-full capitalize transition-colors font-semibold ${logoPosition === pos ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200'}`}>
+                                                    {pos.replace('-', ' ')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
